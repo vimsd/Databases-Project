@@ -1,33 +1,28 @@
 version: '3.8'
 
 services:
-  # บริการ MySQL
+  # ฐานข้อมูล MySQL
   mysql_db:
     image: mysql:8.0
     container_name: cinema_mysql
-    restart: always
     environment:
       MYSQL_DATABASE: cinema_db
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD} # ดึงค่าจากไฟล์ .env
+      MYSQL_ROOT_PASSWORD: rootpassword # ปรับให้ตรงกับ .env ของคุณ
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
 
-  # บริการ MongoDB
+  # ฐานข้อมูล MongoDB
   mongo_db:
     image: mongo:latest
     container_name: cinema_mongo
-    restart: always
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: rootpassword
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
 
-  # บริการ Backend (Node.js)
+  # Backend API
   backend:
     build: ./backend
     container_name: cinema_backend
@@ -38,7 +33,19 @@ services:
       - mongo_db
     environment:
       DB_HOST: mysql_db
-      MONGO_URI: mongodb://root:rootpassword@mongo_db:27017/cinema_logs?authSource=admin
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      DB_NAME: cinema_db
+      MONGO_URI: mongodb://mongo_db:27017/cinema_logs
+
+  # Frontend (React Router)
+  frontend:
+    build: ./frontend
+    container_name: cinema_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
 
 volumes:
   mysql_data:
