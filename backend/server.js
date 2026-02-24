@@ -8,45 +8,49 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- 🟢 ส่วนการเชื่อมต่อฐานข้อมูล ---
-
-// MySQL Connection
+// --- 🟢 1. Database Connections ---
 const db = mysql.createPool({
     host: process.env.DB_HOST || 'mysql_db',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || 'rootpassword',
-    database: process.env.DB_NAME || 'cinema_db'
+    database: process.env.DB_NAME || 'cinema_db',
+    waitForConnections: true,
+    connectionLimit: 10
 });
 
-// MongoDB Connection
 const mongoURI = process.env.MONGO_URI || 'mongodb://mongo_db:27017/cinema_logs';
 mongoose.connect(mongoURI)
-    .then(() => console.log('🍃 MongoDB Connected'))
-    .catch(err => console.error('❌ MongoDB Error:', err));
+    .then(() => console.log('🍃 MongoDB Connected (Seating & Logs)'))
+    .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
-// --- 🔵 MongoDB Models (Schemas) ---
-
-const Theater = mongoose.model('Theater', new mongoose.Schema({
+// --- 🔵 2. MongoDB Schemas & Models ---
+const theaterSchema = new mongoose.Schema({
+    showtimeId: { type: Number, required: true, unique: true },
     movieId: Number,
     theaterName: String,
     seats: [{
         seatNumber: String,
         isReserved: { type: Boolean, default: false },
-        reservedUntil: Date, // null = จองถาวร, มีค่า = จองชั่วคราว
+        reservedUntil: Date, 
         price: { type: Number, default: 200 }
     }]
-}));
+});
+const Theater = mongoose.model('Theater', theaterSchema);
 
-const Payment = mongoose.model('Payment', new mongoose.Schema({
+const paymentSchema = new mongoose.Schema({
+    showtimeId: Number,
+    seatNumbers: [String],
     amount: Number,
-    method: String,
-    status: String,
+    status: { type: String, default: 'completed' },
     timestamp: { type: Date, default: Date.now }
-}));
+});
+const Payment = mongoose.model('Payment', paymentSchema);
 
-// --- 🔴 API Routes ---
+// --- 🔴 3. API Routes ---
 
-// 1. ดึงข้อมูลหนังจาก MySQL
+// --- [MySQL] Movies Management ---
+
+// ดึงข้อมูลหนังทั้งหมด
 app.get('/api/movies', async (req, res) => {
     try {
         const [rows] = await db.query('SELECT * FROM movies ORDER BY id DESC');
@@ -54,58 +58,138 @@ app.get('/api/movies', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 2. ดึงผังที่นั่งของหนังแต่ละเรื่องจาก MongoDB
-app.get('/api/theater/:movieId', async (req, res) => {
+// เพิ่มหนังใหม่
+app.post('/api/movies', async (req, res) => {
+    const { title, genre, duration, poster_url } = req.body;
     try {
-        let theater = await Theater.findOne({ movieId: req.params.movieId });
-        // ถ้ายังไม่มีโรงหนัง ให้ Mock ข้อมูลขึ้นมา 10 ที่นั่ง
+        const [result] = await db.query(
+            'INSERT INTO movies (title, genre, duration, poster_url) VALUES (?, ?, ?, ?)',
+            [title, genre, duration, poster_url]
+        );
+        res.json({ id: result.insertId, title, genre, duration, poster_url });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// แก้ไขข้อมูลหนัง
+app.put('/api/movies/:id', async (req, res) => {
+    const { title, genre, duration, poster_url } = req.body;
+    try {
+        await db.query(
+            'UPDATE movies SET title = ?, genre = ?, duration = ?, poster_url = ? WHERE id = ?',
+            [title, genre, duration, poster_url, req.params.id]
+        );
+        res.json({ message: "Movie updated successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ลบหนัง
+app.delete('/api/movies/:id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM movies WHERE id = ?', [req.params.id]);
+        res.json({ message: "Movie deleted from MySQL" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- [MySQL] Showtimes Management ---
+
+// ดึงรอบฉายของหนังแต่ละเรื่อง
+app.get('/api/movies/:id/showtimes', async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            'SELECT id, show_time, theater_no FROM showtimes WHERE movie_id = ? ORDER BY show_time', 
+            [req.params.id]
+        );
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// เพิ่มรอบฉายใหม่
+app.post('/api/showtimes', async (req, res) => {
+    const { movie_id, show_time, theater_no } = req.body;
+    try {
+        const [result] = await db.query(
+            'INSERT INTO showtimes (movie_id, show_time, theater_no) VALUES (?, ?, ?)',
+            [movie_id, show_time, theater_no]
+        );
+        res.json({ id: result.insertId, movie_id, show_time, theater_no });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ลบรอบฉายและล้างผังที่นั่งใน MongoDB
+app.delete('/api/showtimes/:id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM showtimes WHERE id = ?', [req.params.id]);
+        await Theater.deleteOne({ showtimeId: req.params.id });
+        res.json({ message: "Showtime and seating data deleted" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- [MongoDB] Seating & Bookings ---
+
+// ดึงผังที่นั่งตามรอบฉาย (ถ้าไม่มีจะสร้างใหม่ให้อัตโนมัติ)
+app.get('/api/theater/showtime/:showtimeId', async (req, res) => {
+    const { showtimeId } = req.params;
+    try {
+        let theater = await Theater.findOne({ showtimeId });
         if (!theater) {
-            const mockSeats = Array.from({ length: 10 }, (_, i) => ({
-                seatNumber: `A${i + 1}`,
-                isReserved: false,
-                price: 200
-            }));
-            theater = await Theater.create({ movieId: req.params.movieId, theaterName: "Hall 1", seats: mockSeats });
+            const seats = [];
+            // สร้าง 20 ที่นั่งเริ่มต้น (A1-D5)
+            for (let i = 1; i <= 20; i++) {
+                seats.push({ 
+                    seatNumber: `${String.fromCharCode(64 + Math.ceil(i/5))}${i%5 || 5}`, 
+                    isReserved: false, 
+                    price: 200 
+                });
+            }
+            theater = await Theater.create({ showtimeId, theaterName: "Standard Hall", seats });
         }
         res.json(theater);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 3. ระบบจองที่นั่งชั่วคราว (Hold Seats - 10 Mins)
+// จองที่นั่งชั่วคราว (Hold Seats)
 app.post('/api/bookings/hold', async (req, res) => {
-    const { movieId, seatNumbers } = req.body;
-    const holdTime = new Date(Date.now() + 10 * 60 * 1000); // 10 นาที
+    const { showtimeId, seatNumbers } = req.body;
+    const holdUntil = new Date(Date.now() + 10 * 60 * 1000); // ล็อกไว้ 10 นาที
+
     try {
-        const theater = await Theater.findOne({ movieId });
+        const theater = await Theater.findOne({ showtimeId });
+        if (!theater) return res.status(404).json({ error: "Theater not found" });
+
         theater.seats.forEach(seat => {
             if (seatNumbers.includes(seat.seatNumber)) {
-                if (seat.isReserved && (!seat.reservedUntil || seat.reservedUntil > new Date())) {
-                    throw new Error(`ที่นั่ง ${seat.seatNumber} ไม่ว่าง`);
-                }
+                const isAlreadyHeld = seat.isReserved && seat.reservedUntil && seat.reservedUntil > new Date();
+                const isSold = seat.isReserved && !seat.reservedUntil;
+                if (isSold || isAlreadyHeld) throw new Error(`Seat ${seat.seatNumber} is taken`);
+                
                 seat.isReserved = true;
-                seat.reservedUntil = holdTime;
+                seat.reservedUntil = holdUntil;
             }
         });
         await theater.save();
-        res.json({ message: "จองชั่วคราวสำเร็จ", expiresAt: holdTime });
+        res.json({ message: "Seats held successfully", expiresAt: holdUntil });
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// 4. ระบบจ่ายเงินแบบ Mock
+// ยืนยันการชำระเงินและล็อกที่นั่งถาวร
 app.post('/api/payments/mock', async (req, res) => {
-    const { movieId, seatNumbers, amount } = req.body;
+    const { showtimeId, seatNumbers, amount } = req.body;
     try {
-        await Payment.create({ amount, method: "PromptPay Mock", status: "completed" });
-        const theater = await Theater.findOne({ movieId });
+        await Payment.create({ showtimeId, seatNumbers, amount });
+        const theater = await Theater.findOne({ showtimeId });
         theater.seats.forEach(seat => {
             if (seatNumbers.includes(seat.seatNumber)) {
-                seat.reservedUntil = null; // ยืนยันจองถาวร
+                seat.isReserved = true;
+                seat.reservedUntil = null; // ลบเวลาหมดอายุออกเพื่อให้เป็นสถานะจองถาวร
             }
         });
         await theater.save();
-        res.json({ message: "ชำระเงินและยืนยันที่นั่งสำเร็จ!" });
-    } catch (err) { res.status(500).json({ error: "การชำระเงินผิดพลาด" }); }
+        res.json({ message: "Payment confirmed!" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-const PORT = 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// --- ⚙️ 4. Server Start ---
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`🚀 Cinema API is running on port ${PORT}`);
+});
