@@ -403,6 +403,13 @@ function HomePage({ movies, user, setUser }) {
                         <p className="text-slate-600 font-black uppercase tracking-widest animate-pulse">No Movies Found in Database</p>
                     </div>
                 )}
+
+                {/* 🟢 ส่วนที่เพิ่มเข้ามา: แสดงระบบจัดการการจองของ MongoDB สำหรับ Admin เท่านั้น */}
+                {user.role === 'admin' && (
+                    <div className="mt-20 border-t border-white/5 pt-10">
+                        <AdminBookingManager />
+                    </div>
+                )}
             </main>
 
             <footer className="mt-32 text-center border-t border-white/5 pt-10 max-w-7xl mx-auto">
@@ -568,6 +575,48 @@ function ManageShowtimes({ movieId }) {
     );
 }
 
+function AdminBookingManager() {
+    const [bookings, setBookings] = useState([]);
+
+    const fetchBookings = () => {
+        axios.get(`${API_URL}/admin/payments`).then(res => setBookings(res.data));
+    };
+
+    useEffect(() => { fetchBookings(); }, []);
+
+    const handleCancel = async (id) => {
+        if (window.confirm("คุณต้องการยกเลิกการจองนี้และปล่อยที่นั่งให้ว่างใช่หรือไม่?")) {
+            try {
+                await axios.delete(`${API_URL}/admin/payments/${id}`);
+                alert("ยกเลิกสำเร็จ");
+                fetchBookings();
+            } catch (err) { alert("เกิดข้อผิดพลาด"); }
+        }
+    };
+
+    return (
+        <div className="p-8 bg-slate-900 rounded-3xl border border-white/5 mt-8">
+            <h2 className="text-2xl font-black mb-6 italic text-cyan-400">BOOKING MANAGEMENT (MONGODB CRUD)</h2>
+            <div className="grid gap-4">
+                {bookings.map(b => (
+                    <div key={b._id} className="flex justify-between items-center bg-slate-800 p-5 rounded-2xl border border-white/5">
+                        <div>
+                            <p className="text-white font-bold">Seats: {b.seatNumbers.join(', ')}</p>
+                            <p className="text-slate-400 text-xs">Showtime ID: {b.showtimeId} | Amount: {b.amount} THB</p>
+                        </div>
+                        <button 
+                            onClick={() => handleCancel(b._id)}
+                            className="bg-red-500/10 text-red-500 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-500 hover:text-white transition-all"
+                        >
+                            CANCEL & RELEASE
+                        </button>
+                    </div>
+                ))}
+                {bookings.length === 0 && <p className="text-slate-500 italic text-center">No bookings found.</p>}
+            </div>
+        </div>
+    );
+}
 // --- 5. Main App ---
 export default function App() {
     const [movies, setMovies] = useState([]);

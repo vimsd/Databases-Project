@@ -33,9 +33,9 @@ CREATE TABLE showtimes (
 
 -- 4. เพิ่มข้อมูลเริ่มต้น (Mock Data)
 INSERT INTO movies (title, genre, duration, poster_url) VALUES 
-('Interstellar', 'Sci-Fi', 169, 'https://image.tmdb.org/t/p/w500/gEU2QvYBebnSdyVvPoffMa0pAcy.jpg'),
-('The Dark Knight', 'Action', 152, 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDp9QmSJuaxp7vIBmPi.jpg'),
-('Inception', 'Sci-Fi', 148, 'https://image.tmdb.org/t/p/w500/9gk7Fn9UdB10o3uI9Y9EUBoxCqm.jpg');
+('Interstellar', 'Sci-Fi', 169, 'https://media.readthecloud.co/wp-content/uploads/2024/09/23141022/Interstellar-2.webp'),
+('The Dark Knight', 'Action', 152, 'https://i0.wp.com/www.tomrichmond.com/wp-content/uploads/2008/07/29look4.jpg?resize=425%2C287&ssl=1'),
+('Inception', 'Sci-Fi', 148, 'https://welldonemovies.com/wp-content/uploads/2023/09/inception-1024x768.jpg');
 
 INSERT INTO users (username, password, role) VALUES 
 ('admin', '1234', 'admin'),

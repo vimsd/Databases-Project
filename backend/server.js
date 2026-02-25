@@ -147,6 +147,17 @@ app.get('/api/theater/showtime/:showtimeId', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/showtimes/:id', async (req, res) => {
+    const { show_time, theater_no } = req.body;
+    try {
+        await db.query(
+            'UPDATE showtimes SET show_time = ?, theater_no = ? WHERE id = ?',
+            [show_time, theater_no, req.params.id]
+        );
+        res.json({ message: "Showtime updated successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // จองที่นั่งชั่วคราว (Hold Seats)
 app.post('/api/bookings/hold', async (req, res) => {
     const { showtimeId, seatNumbers } = req.body;
@@ -185,6 +196,56 @@ app.post('/api/payments/mock', async (req, res) => {
         });
         await theater.save();
         res.json({ message: "Payment confirmed!" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ดึงประวัติการจองทั้งหมด (Read - MongoDB)
+// [MongoDB] ดึงรายการจองทั้งหมด (Read)
+app.get('/api/admin/payments', async (req, res) => {
+    try {
+        const payments = await Payment.find().sort({ timestamp: -1 });
+        res.json(payments);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// [MongoDB] ยกเลิกการจองและคืนสถานะที่นั่ง (Update & Delete/Soft Delete)
+app.delete('/api/admin/payments/:id', async (req, res) => {
+    try {
+        const payment = await Payment.findById(req.params.id);
+        if (!payment) return res.status(404).json({ error: "ไม่พบข้อมูลการจอง" });
+
+        // 1. คืนสถานะที่นั่งใน MongoDB Theater Collection (Update)
+        const theater = await Theater.findOne({ showtimeId: payment.showtimeId });
+        if (theater) {
+            theater.seats.forEach(seat => {
+                if (payment.seatNumbers.includes(seat.seatNumber)) {
+                    seat.isReserved = false;
+                    seat.reservedUntil = null;
+                }
+            });
+            await theater.save();
+        }
+
+        // 2. ลบประวัติการจอง (Delete) หรือจะใช้ .findByIdAndUpdate เพื่อทำ Soft Delete ก็ได้
+        await Payment.findByIdAndDelete(req.params.id);
+        
+        res.json({ message: "ยกเลิกการจองและคืนที่นั่งเรียบร้อยแล้ว" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ยกเลิกการจอง (Update สถานะเป็น 'cancelled' - MongoDB)
+app.patch('/api/admin/payments/:id/cancel', async (req, res) => {
+    try {
+        const payment = await Payment.findByIdAndUpdate(req.params.id, { status: 'cancelled' });
+        // เมื่อยกเลิกแล้ว ต้องไปปลดล็อกที่นั่งในตาราง Theater ด้วย
+        const theater = await Theater.findOne({ showtimeId: payment.showtimeId });
+        theater.seats.forEach(seat => {
+            if (payment.seatNumbers.includes(seat.seatNumber)) {
+                seat.isReserved = false;
+            }
+        });
+        await theater.save();
+        res.json({ message: "Booking cancelled successfully" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
