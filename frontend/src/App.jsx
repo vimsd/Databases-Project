@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import toast, { Toaster } from 'react-hot-toast';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -645,14 +646,24 @@ export default function App() {
 
     return (
         <Router>
+            {/* 🟢 ปิดแท็กด้วย /> และตั้งค่าสีพื้นหลังให้เข้ากับธีมของแอป */}
+            <Toaster 
+                position="top-center" 
+                toastOptions={{
+                    style: {
+                        background: '#1e293b', /* สี slate-800 */
+                        color: '#fff',
+                        borderRadius: '1rem',
+                    }
+                }} 
+            />
             <Routes>
                 <Route path="/" element={<HomePage movies={movies} user={user} setUser={setUser} />} />
                 <Route path="/add-movie" element={<AddMoviePage setMovies={setMovies} />} />
                 <Route path="/manage/:id" element={<ManageMoviePage movies={movies} setMovies={setMovies} />} />
-                
+        
                 {/* 🟢 แก้ไขตรงนี้: เปลี่ยนจาก :movieId เป็น :showtimeId เพื่อความชัดเจน */}
                 <Route path="/book/:showtimeId" element={<BookingPage />} />
             </Routes>
         </Router>
-    );
-}
+    )}
