@@ -346,29 +346,34 @@ function HomePage({ movies, user, setUser }) {
     return (
         <div className="min-h-screen bg-slate-950 text-white p-6 sm:p-12 selection:bg-cyan-500/30">
             {/* Navigation Bar - บีบเข้ากึ่งกลางด้วย max-w-7xl */}
-            <nav className="flex justify-between items-center mb-16 max-w-7xl mx-auto border-b border-white/5 pb-8">
-                <div className="flex flex-col">
-                    <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 italic tracking-tighter">
+            <nav className="flex justify-between items-center mb-12 max-w-7xl mx-auto border-b border-white/5 pb-6">
+    
+                {/* ด้านซ้าย: โลโก้ */}
+                <div>
+                    <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 italic tracking-tighter">
                         MOVIESQL.CORE
                     </h1>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.4em]">Integrated Cinema System</span>
+                    <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-[0.3em]">
+                        Integrated Cinema System
+                    </p>
                 </div>
-                
-                <div className="flex items-center gap-6">
-                    <div className="text-right hidden sm:block">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Active Session</p>
-                        <p className="text-xs font-bold text-cyan-500 uppercase">{user.role}</p>
+    
+                {/* ด้านขวา: ข้อมูลผู้ใช้และปุ่ม Logout */}
+                <div className="flex items-center gap-4 md:gap-6">
+                    <div className="text-right">
+                        <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Session</p>
+                        <p className="text-xs md:text-sm font-bold text-cyan-500 uppercase">{user.role}</p>
                     </div>
+        
+                    {/* เปลี่ยนกลับมาใช้ปุ่มแบบมีข้อความ เพื่อให้ปุ่มมีขนาดคงที่ ไม่ถูกเบียด */}
                     <button 
                         onClick={() => setUser(null)} 
-                        className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white p-3 rounded-2xl transition-all group"
-                        title="Logout"
+                        className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-5 py-3 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest transition-all shadow-sm"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
+                        Logout
                     </button>
                 </div>
+    
             </nav>
 
             {/* Main Content Area - บีบเข้ากึ่งกลางด้วย max-w-7xl */}
