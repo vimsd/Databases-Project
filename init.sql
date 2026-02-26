@@ -64,3 +64,6 @@ CREATE TABLE payments (
 );
 
 
+
+insert value into users(1001 , "user1@gmail.com" , "user1");
+

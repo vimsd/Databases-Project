@@ -36,3 +36,24 @@ def create_booking():
         return jsonify({"error": str(e)}), 400
     finally:
         conn.close()
+
+@booking_bp.route('/api/transactions/<int:user_id>')
+def transactions(user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT payments.payment_id,
+               payments.amount,
+               payments.payment_time
+        FROM payments
+        JOIN booking ON payments.booking_id = booking.booking_id
+        WHERE booking.user_id = %s
+    """, (user_id,))
+
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify(result)

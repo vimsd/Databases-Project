@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Movies</title>
+</head>
+<body>
+
+<h1>Movies</h1>
+<ul id="movies"></ul>
+
+<script>
+/* MOCK DATA ชั่วคราว */
+const movies = [
+  { movie_id: 1, title: "Dune" },
+  { movie_id: 2, title: "Oppenheimer" }
+];
+
+const ul = document.getElementById("movies");
+movies.forEach(m => {
+  ul.innerHTML += `
+    <li>
+      ${m.title}
+      <a href="showtimes.html?movie_id=${m.movie_id}">Select</a>
+    </li>
+  `;
+});
+</script>
+
+</body>
+</html>

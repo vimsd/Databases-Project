@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Showtimes</title>
+</head>
+<body>
+
+<h1>Showtimes</h1>
+<ul id="list"></ul>
+
+<script>
+const params = new URLSearchParams(location.search);
+const movie_id = params.get("movie_id");
+
+fetch(`http://127.0.0.1:5000/api/showtimes?movie_id=${movie_id}`)
+  .then(r => r.json())
+  .then(data => {
+    const ul = document.getElementById("list");
+    data.forEach(s => {
+      ul.innerHTML += `
+        <li>
+          ${s.showtime}
+          <a href="seats.html?showtime_id=${s.showtime_id}">
+            Select Seat
+          </a>
+        </li>
+      `;
+    });
+  });
+</script>
+
+</body>
+</html>

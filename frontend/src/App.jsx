@@ -1,714 +1,145 @@
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
-import toast, { Toaster } from 'react-hot-toast';
+import { useState, useEffect } from "react";
 
-const API_URL = 'http://localhost:5000/api';
+const API = "http://127.0.0.1:5000";
 
-// --- 1. หน้าจองที่นั่ง (Seating Page - เชื่อม MongoDB) ---
-// --- 1. หน้าจองที่นั่ง (Seating Page - เชื่อม MongoDB แยกตามรอบฉาย) ---
-function BookingPage() {
-    // แก้ไข: ใช้ showtimeId เพื่อให้ตรงกับ Logic ของรอบฉาย
-    const { showtimeId } = useParams(); 
-    const navigate = useNavigate();
-    const [theater, setTheater] = useState(null);
-    const [selectedSeats, setSelectedSeats] = useState([]);
+function App() {
+  const [user, setUser] = useState(null);
 
-    // 1. ดึงข้อมูลที่นั่งตามรอบฉาย (Showtime ID)
-    useEffect(() => {
-        // ดึงผังที่นั่งจาก MongoDB โดยใช้ ID ของรอบฉาย
-        axios.get(`${API_URL}/theater/showtime/${showtimeId}`)
-            .then(res => setTheater(res.data))
-            .catch(err => {
-                console.error("Fetch error:", err);
-                alert("ไม่สามารถโหลดผังที่นั่งได้");
-            });
-    }, [showtimeId]);
-
-    // 2. ฟังก์ชันจองและชำระเงิน
-    const handleBookingProcess = async () => {
-        if (selectedSeats.length === 0) return;
-
-        try {
-            // สั่ง Hold ที่นั่งชั่วคราว
-            await axios.post(`${API_URL}/bookings/hold`, { 
-                showtimeId: showtimeId, 
-                seatNumbers: selectedSeats 
-            });
-
-            const total = selectedSeats.length * 200;
-            const confirmPay = window.confirm(
-                `🎬 ยืนยันการจองที่นั่ง: ${selectedSeats.join(', ')}\nยอดชำระ: ${total.toLocaleString()} บาท`
-            );
-
-            if (confirmPay) {
-                // ยืนยันการชำระเงิน (จะทำให้ isReserved กลายเป็น true ถาวรในรอบนั้น)
-                await axios.post(`${API_URL}/payments/mock`, { 
-                    showtimeId: showtimeId, 
-                    seatNumbers: selectedSeats, 
-                    amount: total 
-                });
-                alert("✨ ชำระเงินสำเร็จ! ขอให้สนุกกับการชมภาพยนตร์");
-                navigate('/');
-            }
-        } catch (err) {
-            alert(err.response?.data?.error || "เกิดข้อผิดพลาดในการจอง");
-            window.location.reload(); // รีโหลดเพื่ออัปเดตสถานะที่นั่งล่าสุด
-        }
-    };
-
-    if (!theater) return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-cyan-500"></div>
-        </div>
-    );
-
+  // ---------- LOGIN ----------
+  if (!user) {
     return (
-        // เพิ่ม pb-40 เพื่อป้องกันไม่ให้แถบชำระเงินด้านล่างทับที่นั่งแถวสุดท้าย
-        <div className="min-h-screen bg-slate-950 text-white p-6 sm:p-10 pb-40 font-sans">
-            <div className="max-w-4xl mx-auto">
-                {/* Header Section */}
-                <div className="flex justify-between items-end mb-16">
-                    <div className="space-y-2">
-                        <button onClick={() => navigate('/')} className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.3em] hover:opacity-70 transition-all">
-                            ← Back to Home
-                        </button>
-                        <h2 className="text-5xl font-black italic tracking-tighter text-white uppercase leading-none">
-                            {theater.theaterName || "Main Hall"}
-                        </h2>
-                        <p className="text-slate-500 text-xs font-bold tracking-widest uppercase">Premium Experience</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-slate-600 text-[9px] font-black uppercase tracking-widest">Seat Price</p>
-                        <p className="text-2xl font-black text-cyan-400">200.00 <span className="text-xs">THB</span></p>
-                    </div>
-                </div>
-
-                {/* Cinema Screen Layout */}
-                <div className="relative mb-24 group">
-                    <div className="w-full h-4 bg-cyan-500 opacity-20 rounded-[100%] blur-2xl group-hover:opacity-40 transition-opacity"></div>
-                    <div className="w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent rounded-full shadow-[0_0_25px_rgba(6,182,212,1)]"></div>
-                    <p className="text-center text-[9px] font-black tracking-[1.5em] text-cyan-500/40 mt-6 uppercase">Screen</p>
-                </div>
-
-                {/* Seating Grid */}
-                <div className="bg-slate-900/40 backdrop-blur-2xl p-10 sm:p-14 rounded-[4rem] border border-white/5 shadow-2xl">
-                    <div className="grid grid-cols-5 gap-4 sm:gap-6 mb-16">
-                        {theater.seats.map(seat => {
-                            const isSold = seat.isReserved && !seat.reservedUntil;
-                            const isHeld = seat.isReserved && seat.reservedUntil && new Date(seat.reservedUntil) > new Date();
-                            const isSelected = selectedSeats.includes(seat.seatNumber);
-
-                            return (
-                                <button
-                                    key={seat.seatNumber}
-                                    disabled={isSold || isHeld}
-                                    onClick={() => setSelectedSeats(prev => 
-                                        isSelected ? prev.filter(s => s !== seat.seatNumber) : [...prev, seat.seatNumber]
-                                    )}
-                                    className={`
-                                        relative h-14 sm:h-20 rounded-2xl font-black text-sm transition-all duration-300 transform
-                                        ${isSold ? 'bg-slate-800/30 text-slate-700 cursor-not-allowed' : 
-                                          isHeld ? 'bg-amber-600/20 text-amber-600 cursor-wait' :
-                                          isSelected ? 'bg-cyan-500 text-black scale-110 shadow-[0_0_30px_rgba(6,182,212,0.6)]' : 
-                                          'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:scale-105'}
-                                    `}
-                                >
-                                    {seat.seatNumber}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Legend */}
-                    <div className="flex flex-wrap justify-center gap-10 py-8 border-t border-white/5">
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-slate-800 rounded-sm"></div>
-                            <span className="text-[10px] font-black text-slate-500 uppercase">Available</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-cyan-500 rounded-sm"></div>
-                            <span className="text-[10px] font-black text-slate-500 uppercase">Selected</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-slate-800 opacity-30 rounded-sm"></div>
-                            <span className="text-[10px] font-black text-slate-500 uppercase">Reserved</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Floating Payment Bar (z-50 เพื่อให้อยู่หน้าสุด) */}
-                <div className={`
-                    fixed bottom-10 left-1/2 -translate-x-1/2 w-[90%] max-w-lg bg-white p-6 rounded-[2.5rem] 
-                    flex justify-between items-center transition-all duration-700 shadow-2xl z-50
-                    ${selectedSeats.length > 0 ? 'translate-y-0 opacity-100' : 'translate-y-40 opacity-0 pointer-events-none'}
-                `}>
-                    <div className="pl-4">
-                        <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Total Price</p>
-                        <p className="text-slate-900 font-black text-xl tracking-tighter">
-                            {selectedSeats.length} SEATS <span className="text-slate-300 mx-2">|</span> ฿{(selectedSeats.length * 200).toLocaleString()}
-                        </p>
-                    </div>
-                    <button 
-                        onClick={handleBookingProcess}
-                        className="bg-cyan-500 hover:bg-slate-900 hover:text-white text-black px-10 py-4 rounded-2xl font-black uppercase text-xs transition-all active:scale-95"
-                    >
-                        Checkout
-                    </button>
-                </div>
-            </div>
-        </div>
+      <div style={{ padding: 40, color: "white" }}>
+        <h1>🎬 Cinema System</h1>
+        <Login onLogin={setUser} />
+      </div>
     );
-}
-// Helper Component สำหรับ Legend
-function LegendItem({ color, label }) {
-    return (
-        <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 ${color} rounded-sm`}></div>
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
-        </div>
-    );
-}
-// --- 2. หน้าจัดการหนัง (Manage/Delete Page) ---
-// --- เพิ่ม/แก้ไขฟังก์ชัน ManageMoviePage เพื่อให้รองรับการอัปเดต List หนัง ---
-function ManageMoviePage({ movies, setMovies }) {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const [movie, setMovie] = useState({
-        title: '',
-        genre: '',
-        duration: '',
-        poster_url: ''
-    });
-    const [loading, setLoading] = useState(true);
+  }
 
-    useEffect(() => {
-        // ดึงข้อมูลจาก State แทนการยิง API ใหม่เพื่อความเร็ว
-        const targetMovie = movies.find(m => m.id === parseInt(id));
-        if (targetMovie) {
-            setMovie(targetMovie);
-            setLoading(false);
-        } else {
-            // ถ้าหาใน State ไม่เจอ (เช่น กด Refresh หน้าจัดการ) ให้ดึงจาก API
-            axios.get(`${API_URL}/movies`)
-                .then(res => {
-                    const found = res.data.find(m => m.id === parseInt(id));
-                    if (found) setMovie(found);
-                    setLoading(false);
-                })
-                .catch(() => setLoading(false));
-        }
-    }, [id, movies]);
-
-    const handleUpdateMovie = async (e) => {
-        e.preventDefault();
-        try {
-            await axios.put(`${API_URL}/movies/${id}`, movie);
-            
-            // *** สำคัญ: อัปเดต State หลัก (movies) เพื่อให้หน้า Home เปลี่ยนตามทันที ***
-            setMovies(prev => prev.map(m => m.id === parseInt(id) ? { ...m, ...movie } : m));
-            
-            alert("✅ อัปเดตข้อมูลหนังสำเร็จ");
-            navigate('/');
-        } catch (err) {
-            alert("❌ อัปเดตไม่สำเร็จ: " + (err.response?.data?.error || err.message));
-        }
-    };
-
-    const handleDeleteMovie = async () => {
-        if(window.confirm("🚨 ลบหนังเรื่องนี้ออกจากระบบถาวร? (รอบฉายและผังที่นั่งจะถูกลบด้วย)")) {
-            try {
-                await axios.delete(`${API_URL}/movies/${id}`);
-                // อัปเดต State โดยการกรองหนังที่ลบออก
-                setMovies(prev => prev.filter(m => m.id !== parseInt(id)));
-                navigate('/');
-            } catch (err) {
-                alert("ลบไม่สำเร็จ");
-            }
-        }
-    };
-
-    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-cyan-500 font-black italic animate-pulse">LOADING CORE DATA...</div>;
-
-    return (
-        <div className="min-h-screen bg-slate-950 text-white p-6 sm:p-20">
-            <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16">
-                
-                {/* ฝั่งซ้าย: ฟอร์มแก้ไขข้อมูลหนัง */}
-                <div className="space-y-8">
-                    <button onClick={() => navigate('/')} className="text-slate-500 text-[10px] font-black uppercase tracking-widest hover:text-cyan-500 transition-all flex items-center gap-2 group">
-                        <span className="group-hover:-translate-x-1 transition-transform">←</span> Back to Dashboard
-                    </button>
-                    <h2 className="text-4xl font-black italic tracking-tighter uppercase leading-none text-white">
-                        Edit Movie Info
-                    </h2>
-
-                    <form onSubmit={handleUpdateMovie} className="space-y-4 bg-slate-900/50 p-8 rounded-[2.5rem] border border-white/5 shadow-2xl">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Movie Title</label>
-                            <input 
-                                type="text" 
-                                value={movie.title}
-                                onChange={e => setMovie({...movie, title: e.target.value})}
-                                className="w-full bg-slate-800 border-none rounded-2xl p-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
-                            />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Genre</label>
-                                <input 
-                                    type="text" 
-                                    value={movie.genre}
-                                    onChange={e => setMovie({...movie, genre: e.target.value})}
-                                    className="w-full bg-slate-800 border-none rounded-2xl p-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Min</label>
-                                <input 
-                                    type="number" 
-                                    value={movie.duration}
-                                    onChange={e => setMovie({...movie, duration: e.target.value})}
-                                    className="w-full bg-slate-800 border-none rounded-2xl p-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none"
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Poster URL</label>
-                            <input 
-                                type="text" 
-                                value={movie.poster_url}
-                                onChange={e => setMovie({...movie, poster_url: e.target.value})}
-                                className="w-full bg-slate-800 border-none rounded-2xl p-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none text-xs"
-                            />
-                        </div>
-                        <button type="submit" className="w-full bg-cyan-500 hover:bg-white text-black font-black py-4 rounded-2xl transition-all shadow-lg active:scale-95 uppercase text-[10px] tracking-widest mt-4">
-                            Save Movie Changes
-                        </button>
-                    </form>
-                </div>
-
-                {/* ฝั่งขวา: จัดการรอบฉาย */}
-                <div className="flex flex-col">
-                    <div className="mb-8">
-                        <h2 className="text-4xl font-black italic tracking-tighter uppercase leading-none text-slate-800">
-                            Showtimes
-                        </h2>
-                        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-2">Manage session timing</p>
-                    </div>
-                    
-                    <ManageShowtimes movieId={id} />
-
-                    <div className="mt-auto pt-10">
-                        <div className="bg-red-500/5 p-6 rounded-[2rem] border border-red-500/10 group hover:bg-red-500/10 transition-colors">
-                            <p className="text-[9px] font-black text-red-500/40 uppercase tracking-[0.2em] mb-3 text-center">System Termination</p>
-                            <button 
-                                onClick={handleDeleteMovie}
-                                className="w-full py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-black transition-all border border-red-500/20"
-                            >
-                                DELETE FILM
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+  // ---------- MAIN APP ----------
+  return (
+    <div style={{ padding: 40, color: "white" }}>
+      <h2>Welcome User #{user.user_id}</h2>
+      <Cinema user={user} />
+    </div>
+  );
 }
 
-// --- 3. หน้าเพิ่มหนังใหม่ (Add Movie Page) ---
-// --- 3. หน้าเพิ่มหนังใหม่ (Add Movie Page) ---
-function AddMoviePage({ setMovies }) {
-    const [newMovie, setNewMovie] = useState({ title: '', genre: '', duration: '', poster_url: '' });
-    const navigate = useNavigate();
+/* ================= LOGIN ================= */
 
-    const handleAdd = async (e) => {
-        e.preventDefault();
-        try {
-            // แปลง duration ให้เป็นตัวเลขก่อนส่ง ป้องกัน MySQL Error
-            const movieData = {
-                ...newMovie,
-                duration: parseInt(newMovie.duration) || 120
-            };
-            
-            const res = await axios.post(`${API_URL}/movies`, movieData);
-            setMovies(prev => [res.data, ...prev]);
-            
-            // ใช้ toast แจ้งเตือนถ้าติดตั้ง react-hot-toast ไว้แล้ว (หรือใช้ alert แทนก็ได้)
-            toast.success("บันทึกภาพยนตร์ลง MySQL สำเร็จ!"); 
-            navigate('/');
-        } catch (err) { 
-            alert("เพิ่มไม่สำเร็จ: " + (err.response?.data?.error || err.message)); 
-        }
-    };
+function Login({ onLogin }) {
+  const [email, setEmail] = useState("");
 
-    return (
-        <div className="min-h-screen bg-slate-950 text-white p-6 sm:p-10 flex flex-col items-center justify-center relative">
-            
-            <form onSubmit={handleAdd} className="bg-slate-900/80 backdrop-blur-md p-8 sm:p-12 rounded-[2.5rem] w-full max-w-xl border border-white/10 shadow-2xl space-y-6 relative z-10">
-                <div className="text-center mb-8">
-                    <h2 className="text-3xl font-black italic tracking-tighter text-cyan-400 uppercase">Add New Film</h2>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Database Entry Form</p>
-                </div>
-                
-                <div className="space-y-4">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Movie Title</label>
-                        <input placeholder="e.g. Inception" className="w-full p-4 rounded-2xl bg-slate-800 border-none focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-white" onChange={e => setNewMovie({...newMovie, title: e.target.value})} required />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Genre</label>
-                            <input placeholder="e.g. Sci-Fi" className="w-full p-4 rounded-2xl bg-slate-800 border-none focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-white" onChange={e => setNewMovie({...newMovie, genre: e.target.value})} required />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Duration (Min)</label>
-                            <input type="number" placeholder="120" className="w-full p-4 rounded-2xl bg-slate-800 border-none focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-white" onChange={e => setNewMovie({...newMovie, duration: e.target.value})} required />
-                        </div>
-                    </div>
+  const login = async () => {
+    // mock login (ยังไม่ต่อ backend จริง)
+    onLogin({ user_id: 1, email });
+  };
 
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Poster URL</label>
-                        <input placeholder="https://..." type="url" className="w-full p-4 rounded-2xl bg-slate-800 border-none focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-xs text-white" onChange={e => setNewMovie({...newMovie, poster_url: e.target.value})} required />
-                    </div>
-                </div>
-
-                <div className="flex gap-4 mt-8 pt-4">
-                    <button type="button" onClick={() => navigate('/')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all">
-                        Cancel
-                    </button>
-                    <button type="submit" className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-black py-4 rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)]">
-                        Save to MySQL
-                    </button>
-                </div>
-            </form>
-        </div>
-    );
+  return (
+    <>
+      <input
+        placeholder="Email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+      />
+      <br /><br />
+      <button onClick={login}>Login</button>
+    </>
+  );
 }
 
-// --- 4. หน้าหลัก (Home Page) ---
-function HomePage({ movies, user, setUser }) {
-    return (
-        <div className="min-h-screen bg-slate-950 text-white p-6 sm:p-12 selection:bg-cyan-500/30">
-            {/* Navigation Bar - บีบเข้ากึ่งกลางด้วย max-w-7xl */}
-            <nav className="flex justify-between items-center mb-12 max-w-7xl mx-auto border-b border-white/5 pb-6">
-    
-                {/* ด้านซ้าย: โลโก้ */}
-                <div>
-                    <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 italic tracking-tighter">
-                        MOVIESQL.CORE
-                    </h1>
-                    <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-[0.3em]">
-                        Integrated Cinema System
-                    </p>
-                </div>
-    
-                {/* ด้านขวา: ข้อมูลผู้ใช้และปุ่ม Logout */}
-                <div className="flex items-center gap-4 md:gap-6">
-                    <div className="text-right">
-                        <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Session</p>
-                        <p className="text-xs md:text-sm font-bold text-cyan-500 uppercase">{user.role}</p>
-                    </div>
-        
-                    {/* เปลี่ยนกลับมาใช้ปุ่มแบบมีข้อความ เพื่อให้ปุ่มมีขนาดคงที่ ไม่ถูกเบียด */}
-                    <button 
-                        onClick={() => setUser(null)} 
-                        className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-5 py-3 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest transition-all shadow-sm"
-                    >
-                        Logout
-                    </button>
-                </div>
-    
-            </nav>
+/* ================= CINEMA ================= */
 
-            {/* Main Content Area - บีบเข้ากึ่งกลางด้วย max-w-7xl */}
-            <main className="max-w-7xl mx-auto">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
-                    <div className="space-y-1">
-                        <h2 className="text-6xl font-black italic tracking-tighter uppercase leading-none">
-                            Now Showing
-                        </h2>
-                        <p className="text-cyan-500/50 font-bold text-sm uppercase tracking-[0.3em] ml-1">Current Feature Presentations</p>
-                    </div>
+function Cinema({ user }) {
+  const [movies, setMovies] = useState([]);
+  const [movieId, setMovieId] = useState(null);
+  const [showtimes, setShowtimes] = useState([]);
+  const [showtimeId, setShowtimeId] = useState(null);
+  const [seats, setSeats] = useState([]);
 
-                    {user.role === 'admin' && (
-                        <Link 
-                            to="/add-movie" 
-                            className="bg-white text-black px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-95"
-                        >
-                            + Add New Film
-                        </Link>
-                    )}
-                </div>
+  // โหลด movie (mock เพราะอยู่ NoSQL)
+  useEffect(() => {
+    setMovies([
+      { movie_id: 1, title: "Dune" },
+      { movie_id: 2, title: "Oppenheimer" }
+    ]);
+  }, []);
 
-                {/* Grid Layout - ปรับการเรียงตัวของแผ่นหนัง */}
-                {movies.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                        {movies.map(m => (
-                            <MovieCard key={m.id} movie={m} user={user} />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[3rem]">
-                        <p className="text-slate-600 font-black uppercase tracking-widest animate-pulse">No Movies Found in Database</p>
-                    </div>
-                )}
+  useEffect(() => {
+    if (!movieId) return;
+    fetch(`${API}/api/showtimes?movie_id=${movieId}`)
+      .then(r => r.json())
+      .then(setShowtimes);
+  }, [movieId]);
 
-                {/* 🟢 ส่วนที่เพิ่มเข้ามา: แสดงระบบจัดการการจองของ MongoDB สำหรับ Admin เท่านั้น */}
-                {user.role === 'admin' && (
-                    <div className="mt-20 border-t border-white/5 pt-10">
-                        <AdminBookingManager />
-                    </div>
-                )}
-            </main>
+  useEffect(() => {
+    if (!showtimeId) return;
+    fetch(`${API}/api/seats?showtime_id=${showtimeId}`)
+      .then(r => r.json())
+      .then(setSeats);
+  }, [showtimeId]);
 
-            <footer className="mt-32 text-center border-t border-white/5 pt-10 max-w-7xl mx-auto">
-                <p className="text-[10px] font-bold text-slate-700 uppercase tracking-[0.5em]">
-                    Powered by Node.js • MySQL • MongoDB • Docker
-                </p>
-            </footer>
-        </div>
-    );
+  const bookSeat = (seat_id) => {
+    fetch(`${API}/api/booking`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: user.user_id,
+        showtime_id: showtimeId,
+        seat_id,
+        amount: 250
+      })
+    })
+      .then(r => r.json())
+      .then(res => alert(res.message));
+  };
+
+  return (
+    <>
+      {!movieId && (
+        <>
+          <h2>Select Movie</h2>
+          {movies.map(m => (
+            <div key={m.movie_id}>
+              {m.title}
+              <button onClick={() => setMovieId(m.movie_id)}>Select</button>
+            </div>
+          ))}
+        </>
+      )}
+
+      {movieId && !showtimeId && (
+        <>
+          <button onClick={() => setMovieId(null)}>⬅ Back</button>
+          <h2>Select Showtime</h2>
+          {showtimes.map(s => (
+            <div key={s.showtime_id}>
+              {s.showtime}
+              <button onClick={() => setShowtimeId(s.showtime_id)}>
+                Select
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+
+      {showtimeId && (
+        <>
+          <button onClick={() => setShowtimeId(null)}>⬅ Back</button>
+          <h2>Select Seat</h2>
+          {seats.map(s => (
+            <div key={s.seat_id}>
+              {s.seat}{" "}
+              {s.available ? (
+                <button onClick={() => bookSeat(s.seat_id)}>Book</button>
+              ) : (
+                "(Booked)"
+              )}
+            </div>
+          ))}
+        </>
+      )}
+    </>
+  );
 }
 
-function MovieCard({ movie, user }) {
-    const [showtimes, setShowtimes] = useState([]);
-
-    useEffect(() => {
-        axios.get(`${API_URL}/movies/${movie.id}/showtimes`)
-            .then(res => {
-                console.log(`Showtimes for ${movie.title}:`, res.data);
-                setShowtimes(res.data);
-            })
-            .catch(err => console.error("Error fetching showtimes:", err));
-    }, [movie.id]);
-
-    return (
-        <div className="bg-slate-900/50 rounded-[2.5rem] overflow-hidden border border-white/5 p-6 flex flex-col h-full hover:border-cyan-500/50 transition-all duration-500 group shadow-2xl backdrop-blur-sm">
-            
-            {/* 1. Poster Section - จำกัดความสูงไว้ที่ h-48 เพื่อให้ UI ไม่ยืดเกินไป */}
-            <div className="relative h-48 mb-6 bg-slate-800 rounded-3xl overflow-hidden shrink-0">
-                <img 
-                    src={movie.poster_url || 'https://via.placeholder.com/300x450'} 
-                    alt={movie.title} 
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-80 group-hover:opacity-100" 
-                />
-                <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-black text-cyan-400 uppercase tracking-widest border border-white/10">
-                    {movie.genre || 'Action'}
-                </div>
-            </div>
-            
-            {/* 2. Movie Info - ใช้ flex-grow เพื่อดันส่วน Select Showtime ลงไปด้านล่างเสมอ */}
-            <div className="flex-grow mb-6">
-                <h3 className="text-xl font-black mb-1 truncate text-white uppercase tracking-tighter italic group-hover:text-cyan-400 transition-colors">
-                    {movie.title}
-                </h3>
-                <p className="text-slate-500 text-[9px] font-bold uppercase tracking-[0.2em]">
-                    Duration: {movie.duration || '120'} MIN
-                </p>
-            </div>
-            
-            {/* 3. Showtime Selection Section - เพิ่มเส้นคั่นและจัดระเบียบปุ่ม */}
-            <div className="mt-auto pt-6 border-t border-white/5">
-                <p className="text-slate-400 text-[9px] font-black mb-4 uppercase tracking-[0.3em] opacity-60 text-center">
-                    Select Showtime
-                </p>
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                    {showtimes && showtimes.length > 0 ? (
-                        showtimes.map(st => (
-                            <Link 
-                                key={st.id} 
-                                to={`/book/${st.id}`} 
-                                className="text-center py-2.5 bg-slate-800 hover:bg-cyan-500 hover:text-black rounded-xl text-[11px] font-black transition-all transform active:scale-90 border border-white/5"
-                            >
-                                {st.show_time ? st.show_time.substring(0, 5) : "N/A"}
-                            </Link>
-                        ))
-                    ) : (
-                        <div className="col-span-2 py-4 bg-slate-950/40 rounded-2xl border border-dashed border-white/5 text-center">
-                            <p className="text-slate-600 text-[9px] font-bold uppercase tracking-widest italic">No Rounds Scheduled</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* 4. Admin Management Link */}
-            {user.role === 'admin' && (
-                <Link 
-                    to={`/manage/${movie.id}`} 
-                    className="mt-2 block w-full text-center py-2 text-slate-600 hover:text-cyan-500 text-[9px] font-black uppercase tracking-widest transition-all"
-                >
-                    [ Management Console ]
-                </Link>
-            )}
-        </div>
-    );
-}
-function ManageShowtimes({ movieId }) {
-    const [showtimes, setShowtimes] = useState([]);
-    const [newTime, setNewTime] = useState('');
-
-    const fetchShowtimes = () => {
-        axios.get(`${API_URL}/movies/${movieId}/showtimes`)
-            .then(res => setShowtimes(res.data))
-            .catch(err => console.error(err));
-    };
-
-    useEffect(() => { 
-        if (movieId) fetchShowtimes(); 
-    }, [movieId]);
-
-    const handleAdd = async () => {
-        if (!newTime) return alert("กรุณาเลือกเวลา");
-        try {
-            await axios.post(`${API_URL}/showtimes`, { 
-                movie_id: movieId, 
-                show_time: newTime, 
-                theater_no: 1 
-            });
-            setNewTime('');
-            fetchShowtimes(); 
-        } catch (err) {
-            alert("ไม่สามารถเพิ่มรอบฉายได้");
-        }
-    };
-
-    const handleDelete = async (id) => {
-        if(window.confirm("ยืนยันการลบรอบฉายนี้? ข้อมูลการจองในรอบนี้จะหายไปทั้งหมด")) {
-            try {
-                await axios.delete(`${API_URL}/showtimes/${id}`);
-                fetchShowtimes();
-            } catch (err) {
-                alert("ลบไม่สำเร็จ");
-            }
-        }
-    };
-
-    return (
-        <div className="mt-8 bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-xl">
-            <h4 className="text-xs font-black text-cyan-500 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
-                <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></span>
-                Manage Showtimes
-            </h4>
-            
-            <div className="flex gap-3 mb-6">
-                <input 
-                    type="time" 
-                    value={newTime} 
-                    onChange={e => setNewTime(e.target.value)}
-                    className="bg-slate-800 border-none rounded-xl text-white p-3 flex-1 focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
-                />
-                <button 
-                    onClick={handleAdd} 
-                    className="bg-cyan-600 hover:bg-cyan-500 text-black px-6 rounded-xl font-black text-xl transition-all active:scale-90"
-                >
-                    +
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2">
-                {showtimes.length > 0 ? showtimes.map(st => (
-                    <div key={st.id} className="flex justify-between items-center bg-slate-800/40 p-4 rounded-2xl border border-white/5 group hover:bg-slate-800 transition-all">
-                        <span className="font-black text-white tracking-widest">{st.show_time.substring(0, 5)}</span>
-                        <button 
-                            onClick={() => handleDelete(st.id)} 
-                            className="text-red-500/50 hover:text-red-500 text-[10px] font-black uppercase tracking-tighter transition-all"
-                        >
-                            [ Remove ]
-                        </button>
-                    </div>
-                )) : (
-                    <p className="text-slate-600 text-xs italic text-center py-4">No showtimes created yet.</p>
-                )}
-            </div>
-        </div>
-    );
-}
-
-function AdminBookingManager() {
-    const [bookings, setBookings] = useState([]);
-
-    const fetchBookings = () => {
-        axios.get(`${API_URL}/admin/payments`).then(res => setBookings(res.data));
-    };
-
-    useEffect(() => { fetchBookings(); }, []);
-
-    const handleCancel = async (id) => {
-        if (window.confirm("คุณต้องการยกเลิกการจองนี้และปล่อยที่นั่งให้ว่างใช่หรือไม่?")) {
-            try {
-                await axios.delete(`${API_URL}/admin/payments/${id}`);
-                alert("ยกเลิกสำเร็จ");
-                fetchBookings();
-            } catch (err) { alert("เกิดข้อผิดพลาด"); }
-        }
-    };
-
-    return (
-        <div className="p-8 bg-slate-900 rounded-3xl border border-white/5 mt-8">
-            <h2 className="text-2xl font-black mb-6 italic text-cyan-400">BOOKING MANAGEMENT (MONGODB CRUD)</h2>
-            <div className="grid gap-4">
-                {bookings.map(b => (
-                    <div key={b._id} className="flex justify-between items-center bg-slate-800 p-5 rounded-2xl border border-white/5">
-                        <div>
-                            <p className="text-white font-bold">Seats: {b.seatNumbers.join(', ')}</p>
-                            <p className="text-slate-400 text-xs">Showtime ID: {b.showtimeId} | Amount: {b.amount} THB</p>
-                        </div>
-                        <button 
-                            onClick={() => handleCancel(b._id)}
-                            className="bg-red-500/10 text-red-500 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-500 hover:text-white transition-all"
-                        >
-                            CANCEL & RELEASE
-                        </button>
-                    </div>
-                ))}
-                {bookings.length === 0 && <p className="text-slate-500 italic text-center">No bookings found.</p>}
-            </div>
-        </div>
-    );
-}
-// --- 5. Main App ---
-export default function App() {
-    const [movies, setMovies] = useState([]);
-    const [user, setUser] = useState(null);
-
-    useEffect(() => {
-        axios.get(`${API_URL}/movies`).then(res => setMovies(res.data)).catch(err => console.error(err));
-    }, []);
-
-    if (!user) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6">
-                <h1 className="text-5xl font-black mb-12 text-cyan-400 italic">CINEMA SYSTEM</h1>
-                <div className="flex gap-6">
-                    <button onClick={() => setUser({ role: 'admin' })} className="bg-cyan-600 px-10 py-5 rounded-2xl font-bold uppercase">Admin Login</button>
-                    <button onClick={() => setUser({ role: 'user' })} className="bg-slate-800 px-10 py-5 rounded-2xl font-bold uppercase">User Login</button>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <Router>
-            {/* 🟢 ปิดแท็กด้วย /> และตั้งค่าสีพื้นหลังให้เข้ากับธีมของแอป */}
-            <Toaster 
-                position="top-center" 
-                toastOptions={{
-                    style: {
-                        background: '#1e293b', /* สี slate-800 */
-                        color: '#fff',
-                        borderRadius: '1rem',
-                    }
-                }} 
-            />
-            <Routes>
-                <Route path="/" element={<HomePage movies={movies} user={user} setUser={setUser} />} />
-                <Route path="/add-movie" element={<AddMoviePage setMovies={setMovies} />} />
-                <Route path="/manage/:id" element={<ManageMoviePage movies={movies} setMovies={setMovies} />} />
-        
-                {/* 🟢 แก้ไขตรงนี้: เปลี่ยนจาก :movieId เป็น :showtimeId เพื่อความชัดเจน */}
-                <Route path="/book/:showtimeId" element={<BookingPage />} />
-            </Routes>
-        </Router>
-    )}
+export default App;
