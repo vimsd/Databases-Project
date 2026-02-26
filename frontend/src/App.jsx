@@ -317,6 +317,7 @@ function ManageMoviePage({ movies, setMovies }) {
 }
 
 // --- 3. หน้าเพิ่มหนังใหม่ (Add Movie Page) ---
+// --- 3. หน้าเพิ่มหนังใหม่ (Add Movie Page) ---
 function AddMoviePage({ setMovies }) {
     const [newMovie, setNewMovie] = useState({ title: '', genre: '', duration: '', poster_url: '' });
     const navigate = useNavigate();
@@ -324,19 +325,63 @@ function AddMoviePage({ setMovies }) {
     const handleAdd = async (e) => {
         e.preventDefault();
         try {
-            const res = await axios.post(`${API_URL}/movies`, newMovie);
+            // แปลง duration ให้เป็นตัวเลขก่อนส่ง ป้องกัน MySQL Error
+            const movieData = {
+                ...newMovie,
+                duration: parseInt(newMovie.duration) || 120
+            };
+            
+            const res = await axios.post(`${API_URL}/movies`, movieData);
             setMovies(prev => [res.data, ...prev]);
-            alert("✅ เพิ่มหนังสำเร็จ!");
+            
+            // ใช้ toast แจ้งเตือนถ้าติดตั้ง react-hot-toast ไว้แล้ว (หรือใช้ alert แทนก็ได้)
+            toast.success("บันทึกภาพยนตร์ลง MySQL สำเร็จ!"); 
             navigate('/');
-        } catch (err) { alert("เพิ่มไม่สำเร็จ"); }
+        } catch (err) { 
+            alert("เพิ่มไม่สำเร็จ: " + (err.response?.data?.error || err.message)); 
+        }
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white p-10 flex flex-col items-center">
-            <form onSubmit={handleAdd} className="bg-slate-900 p-8 rounded-[2.5rem] w-full max-w-md border border-white/10 space-y-4">
-                <h2 className="text-2xl font-bold mb-6 text-cyan-400 text-center">Add New Movie</h2>
-                <input placeholder="Title" className="w-full p-4 rounded-xl bg-slate-800" onChange={e => setNewMovie({...newMovie, title: e.target.value})} required />
-                <button type="submit" className="w-full bg-cyan-600 py-4 rounded-xl font-bold">Save to MySQL</button>
+        <div className="min-h-screen bg-slate-950 text-white p-6 sm:p-10 flex flex-col items-center justify-center relative">
+            
+            <form onSubmit={handleAdd} className="bg-slate-900/80 backdrop-blur-md p-8 sm:p-12 rounded-[2.5rem] w-full max-w-xl border border-white/10 shadow-2xl space-y-6 relative z-10">
+                <div className="text-center mb-8">
+                    <h2 className="text-3xl font-black italic tracking-tighter text-cyan-400 uppercase">Add New Film</h2>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Database Entry Form</p>
+                </div>
+                
+                <div className="space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Movie Title</label>
+                        <input placeholder="e.g. Inception" className="w-full p-4 rounded-2xl bg-slate-800 border-none focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-white" onChange={e => setNewMovie({...newMovie, title: e.target.value})} required />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Genre</label>
+                            <input placeholder="e.g. Sci-Fi" className="w-full p-4 rounded-2xl bg-slate-800 border-none focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-white" onChange={e => setNewMovie({...newMovie, genre: e.target.value})} required />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Duration (Min)</label>
+                            <input type="number" placeholder="120" className="w-full p-4 rounded-2xl bg-slate-800 border-none focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-white" onChange={e => setNewMovie({...newMovie, duration: e.target.value})} required />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Poster URL</label>
+                        <input placeholder="https://..." type="url" className="w-full p-4 rounded-2xl bg-slate-800 border-none focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-xs text-white" onChange={e => setNewMovie({...newMovie, poster_url: e.target.value})} required />
+                    </div>
+                </div>
+
+                <div className="flex gap-4 mt-8 pt-4">
+                    <button type="button" onClick={() => navigate('/')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all">
+                        Cancel
+                    </button>
+                    <button type="submit" className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-black py-4 rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)]">
+                        Save to MySQL
+                    </button>
+                </div>
             </form>
         </div>
     );
