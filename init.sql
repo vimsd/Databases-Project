@@ -1,46 +1,66 @@
--- 1. ลบตารางเก่าทิ้งตามลำดับความสัมพันธ์ (ลบลูกก่อนแม่)
-DROP TABLE IF EXISTS showtimes; 
+DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS book_seat;
+DROP TABLE IF EXISTS seats;
+DROP TABLE IF EXISTS booking;
+DROP TABLE IF EXISTS showtimes;
 DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS movies;
 
--- 2. สร้างตาราง movies ... (โค้ดเดิมของคุณ)
-CREATE TABLE movies (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    genre VARCHAR(100),
-    duration INT,
-    poster_url TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 3. สร้างตาราง users ... (โค้ดเดิมของคุณ)
+-- USERS
 CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'user') DEFAULT 'user',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL
 );
 
--- 4. สร้างตาราง showtimes (ต้องสร้างหลังจากสร้าง movies เสร็จแล้ว)
+-- SHOWTIMES
+-- movie_id, theater_id refer to NoSQL
 CREATE TABLE showtimes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    movie_id INT,
-    show_time TIME NOT NULL,
-    theater_no INT,
-    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
+    showtime_id INT AUTO_INCREMENT PRIMARY KEY,
+    movie_id INT NOT NULL,
+    theater_id INT NOT NULL,
+    showtime DATETIME NOT NULL
 );
 
--- 4. เพิ่มข้อมูลเริ่มต้น (Mock Data)
-INSERT INTO movies (title, genre, duration, poster_url) VALUES 
-('Interstellar', 'Sci-Fi', 169, 'https://media.readthecloud.co/wp-content/uploads/2024/09/23141022/Interstellar-2.webp'),
-('The Dark Knight', 'Action', 152, 'https://i0.wp.com/www.tomrichmond.com/wp-content/uploads/2008/07/29look4.jpg?resize=425%2C287&ssl=1'),
-('Inception', 'Sci-Fi', 148, 'https://welldonemovies.com/wp-content/uploads/2023/09/inception-1024x768.jpg');
+-- BOOKING
+CREATE TABLE booking (
+    book_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    showtime_id INT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
-INSERT INTO users (username, password, role) VALUES 
-('admin', '1234', 'admin'),
-('user1', '1234', 'user');
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (showtime_id) REFERENCES showtimes(showtime_id)
+);
 
-INSERT INTO showtimes (movie_id, show_time, theater_no) VALUES 
-(1, '10:30:00', 1), (1, '14:30:00', 1), (1, '19:00:00', 2),
-(2, '11:00:00', 3), (2, '15:30:00', 1);
+-- SEATS
+CREATE TABLE seats (
+    seat_id INT AUTO_INCREMENT PRIMARY KEY,
+    theater_id INT NOT NULL,
+    seat VARCHAR(5) NOT NULL
+);
+
+-- BOOK_SEAT
+CREATE TABLE book_seat (
+    book_seat_id INT AUTO_INCREMENT PRIMARY KEY,
+    showtime_id INT NOT NULL,
+    book_id INT NOT NULL,
+    seat_id INT NOT NULL,
+
+    FOREIGN KEY (showtime_id) REFERENCES showtimes(showtime_id),
+    FOREIGN KEY (book_id) REFERENCES booking(book_id),
+    FOREIGN KEY (seat_id) REFERENCES seats(seat_id),
+
+    UNIQUE (showtime_id, seat_id)
+);
+
+-- PAYMENTS
+CREATE TABLE payments (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    book_id INT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    status ENUM('Failed', 'Pending', 'Paid') DEFAULT 'Pending',
+
+    FOREIGN KEY (book_id) REFERENCES booking(book_id)
+);
+
+

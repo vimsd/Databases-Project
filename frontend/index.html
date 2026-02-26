@@ -20,3 +20,87 @@
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
+
+<h1>Movies</h1>
+<ul id="movies"></ul>
+
+<script>
+fetch("http://127.0.0.1:5000/api/movies")
+  .then(r => r.json())
+  .then(data => {
+    const ul = document.getElementById("movies");
+    data.forEach(m => {
+      ul.innerHTML += `
+        <li>
+          ${m.title}
+          <a href="showtimes.html?movie_id=${m.movie_id}">Select</a>
+        </li>
+      `;
+    });
+  });
+</script>
+
+
+<h1>Showtimes</h1>
+<ul id="list"></ul>
+
+<script>
+const params = new URLSearchParams(location.search);
+const movie_id = params.get("movie_id");
+
+fetch(`http://127.0.0.1:5000/api/showtimes?movie_id=${movie_id}`)
+  .then(r => r.json())
+  .then(data => {
+    const ul = document.getElementById("list");
+    data.forEach(s => {
+      ul.innerHTML += `
+        <li>
+          ${s.showtime}
+          <a href="seats.html?showtime_id=${s.showtime_id}">
+            Select Seat
+          </a>
+        </li>
+      `;
+    });
+  });
+</script>
+
+<h1>Select Seat</h1>
+<ul id="seats"></ul>
+
+<script>
+const showtime_id = new URLSearchParams(location.search).get("showtime_id");
+
+fetch(`http://127.0.0.1:5000/api/seats?showtime_id=${showtime_id}`)
+  .then(r => r.json())
+  .then(data => {
+    const ul = document.getElementById("seats");
+    data.forEach(s => {
+      if (s.available) {
+        ul.innerHTML += `
+          <li>
+            ${s.seat}
+            <button onclick="book(${s.seat_id})">Book</button>
+          </li>
+        `;
+      } else {
+        ul.innerHTML += `<li>${s.seat} (Booked)</li>`;
+      }
+    });
+  });
+
+function book(seat_id) {
+  fetch("http://127.0.0.1:5000/api/booking", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      user_id: 1,
+      showtime_id: showtime_id,
+      seat_id: seat_id,
+      amount: 250
+    })
+  })
+  .then(r => r.json())
+  .then(alert);
+}
+</script>
