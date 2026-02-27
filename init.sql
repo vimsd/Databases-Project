@@ -72,3 +72,5 @@ INSERT INTO seats (theater_id, seat)
 VALUES
   (1, 'A1'), (1, 'A2'), (1, 'A3'), (1, 'A4'), (1, 'A5'),
   (1, 'B1'), (1, 'B2'), (1, 'B3'), (1, 'B4'), (1, 'B5');
+
+"ILoveyou:" "sooooooooooooooo much"  "work in develop"
