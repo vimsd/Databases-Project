@@ -16,15 +16,6 @@ def create_booking():
 
     try:
         with conn.cursor() as cursor:
-            # verify enough balance
-            cursor.execute(
-                "SELECT balance FROM users WHERE user_id = %s",
-                (data["user_id"],)
-            )
-            user = cursor.fetchone()
-            if not user or user["balance"] < data["amount"]:
-                return jsonify({"error": "insufficient balance"}), 400
-
             # 1. create booking
             cursor.execute(
                 "INSERT INTO booking (user_id, showtime_id) VALUES (%s, %s)",
