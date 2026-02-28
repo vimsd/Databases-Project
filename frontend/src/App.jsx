@@ -14,14 +14,14 @@ function App() {
   }, [user]);
 
   const handleLogin = (userData) => {
-    setUser(userData);
+    setUser({ ...userData, balance: Number(userData.balance || 0) });
   };
 
   const refreshUser = () => {
     if (!user) return;
     fetch(`${API}/users/${user.user_id}`)
       .then(r => r.json())
-      .then(setUser)
+      .then(data => setUser({ ...data, balance: Number(data.balance || 0) }))
       .catch(console.error);
   };
 
@@ -168,7 +168,7 @@ function Cinema({ user }) {
   return (
     <>
       <h2 style={styles.welcome}>Welcome User #{user.user_id}</h2>
-      <div>Balance: {user.balance?.toFixed(2) || 0} ฿</div>
+      <div>Balance: {Number(user.balance || 0).toFixed(2)} ฿</div>
       <button onClick={() => setViewTransactions(true)}>My Transactions</button>
 
       {/* STEP INDICATOR */}
