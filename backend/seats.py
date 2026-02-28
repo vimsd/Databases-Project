@@ -13,17 +13,26 @@ def get_seats():
         cursor.execute("SELECT seat_id, seat FROM seats")
         seats = cursor.fetchall()
 
-        # booked seats
+        # reservations (pending/booked)
         cursor.execute("""
-            SELECT seat_id
+            SELECT seat_id, status
             FROM book_seat
             WHERE showtime_id = %s
         """, (showtime_id,))
-        booked = {row["seat_id"] for row in cursor.fetchall()}
+        reserved = {row["seat_id"]: row["status"] for row in cursor.fetchall()}
 
     conn.close()
 
     for seat in seats:
-        seat["available"] = seat["seat_id"] not in booked
+        st = reserved.get(seat["seat_id"])
+        if st == "booked":
+            seat["status"] = "booked"
+            seat["available"] = False
+        elif st == "pending":
+            seat["status"] = "pending"
+            seat["available"] = False
+        else:
+            seat["status"] = "free"
+            seat["available"] = True
 
     return jsonify(seats)

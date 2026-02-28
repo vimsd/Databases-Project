@@ -23,3 +23,37 @@ def create_user():
         return jsonify({"error": str(e)}), 400
     finally:
         conn.close()
+
+
+@users_bp.route("/api/users/<int:user_id>", methods=["GET"])
+def get_user(user_id):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT user_id, email, balance FROM users WHERE user_id = %s",
+                (user_id,)
+            )
+            user = cursor.fetchone()
+            if not user:
+                return jsonify({"error": "not found"}), 404
+            return jsonify(user)
+    finally:
+        conn.close()
+
+
+@users_bp.route("/api/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+            if cursor.rowcount == 0:
+                return jsonify({"error": "not found"}), 404
+        conn.commit()
+        return jsonify({"message": "User deleted"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 400
+    finally:
+        conn.close()

@@ -2,23 +2,22 @@ import { useState } from "react";
 
 const API = import.meta.env.VITE_API || "/api";
 
-export default function Register({ onRegister, switchToLogin }) {
+export default function Login({ onLogin, switchToRegister }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const register = async () => {
+  const login = async () => {
     setError("");
     try {
-      const res = await fetch(`${API}/register`, {
+      const res = await fetch(`${API}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Registration failed");
-      alert("Registered successfully");
-      if (onRegister) onRegister();
+      if (!res.ok) throw new Error(data.message || "Login failed");
+      onLogin(data);
     } catch (e) {
       setError(e.message);
     }
@@ -26,7 +25,7 @@ export default function Register({ onRegister, switchToLogin }) {
 
   return (
     <div style={{ textAlign: "center" }}>
-      <h2>Register</h2>
+      <h2>Login</h2>
       {error && <div style={{ color: "salmon" }}>{error}</div>}
       <input
         placeholder="Email"
@@ -37,11 +36,11 @@ export default function Register({ onRegister, switchToLogin }) {
         type="password"
         onChange={e => setPassword(e.target.value)}
       />
-      <button onClick={register}>Register</button>
+      <button onClick={login}>Login</button>
       <p>
-        Already have an account?{' '}
-        <a href="#" onClick={e => {e.preventDefault(); switchToLogin();}}>
-          Login
+        Don't have an account?{' '}
+        <a href="#" onClick={e => { e.preventDefault(); switchToRegister(); }}>
+          Register
         </a>
       </p>
     </div>

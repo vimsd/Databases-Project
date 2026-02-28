@@ -18,3 +18,13 @@ def get_showtimes():
 
     conn.close()
     return jsonify(data)
+
+
+@showtimes_bp.route("/api/movies", methods=["GET"])
+def get_movies():
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT movie_id, title FROM movies")
+        movies = cursor.fetchall()
+    conn.close()
+    return jsonify(movies)

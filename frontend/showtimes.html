@@ -13,7 +13,7 @@
 const params = new URLSearchParams(location.search);
 const movie_id = params.get("movie_id");
 
-fetch(`http://127.0.0.1:5000/api/showtimes?movie_id=${movie_id}`)
+fetch(`/api/showtimes?movie_id=${movie_id}`)
   .then(r => r.json())
   .then(data => {
     const ul = document.getElementById("list");

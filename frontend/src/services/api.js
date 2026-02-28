@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = '/api';
+// base path will be proxied by vite server; allow override via env var
+const API_URL = import.meta.env.VITE_API || '/api';
 
 export const getMovies = () => axios.get(`${API_URL}/movies`);
 export const createMovie = (data) => axios.post(`${API_URL}/movies`, data); //

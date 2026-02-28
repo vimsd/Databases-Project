@@ -3,13 +3,21 @@ DROP TABLE IF EXISTS book_seat;
 DROP TABLE IF EXISTS booking;
 DROP TABLE IF EXISTS seats;
 DROP TABLE IF EXISTS showtimes;
+DROP TABLE IF EXISTS movies;
 DROP TABLE IF EXISTS users;
 
 -- USERS
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL
+    password VARCHAR(255) NOT NULL,
+    balance DECIMAL(10,2) NOT NULL DEFAULT 0
+);
+
+-- MOVIES
+CREATE TABLE movies (
+    movie_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL
 );
 
 -- SHOWTIMES
@@ -17,7 +25,8 @@ CREATE TABLE showtimes (
     showtime_id INT AUTO_INCREMENT PRIMARY KEY,
     movie_id INT NOT NULL,
     theater_id INT NOT NULL,
-    showtime DATETIME NOT NULL
+    showtime DATETIME NOT NULL,
+    FOREIGN KEY (movie_id) REFERENCES movies(movie_id)
 );
 
 -- BOOKING
@@ -43,6 +52,7 @@ CREATE TABLE book_seat (
     showtime_id INT NOT NULL,
     book_id INT NOT NULL,
     seat_id INT NOT NULL,
+    status ENUM('pending','booked') NOT NULL DEFAULT 'pending',
     FOREIGN KEY (showtime_id) REFERENCES showtimes(showtime_id),
     FOREIGN KEY (book_id) REFERENCES booking(book_id),
     FOREIGN KEY (seat_id) REFERENCES seats(seat_id),
@@ -55,12 +65,16 @@ CREATE TABLE payments (
     book_id INT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     status ENUM('Failed', 'Pending', 'Paid') DEFAULT 'Pending',
+    payment_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (book_id) REFERENCES booking(book_id)
 );
 
 
-INSERT INTO users (email, password)
-VALUES ('user1@gmail.com', 'user1');
+INSERT INTO users (email, password, balance)
+VALUES ('user1@gmail.com', 'u1_pass', 1000.00);
+
+-- sample movies
+INSERT INTO movies (title) VALUES ('Dune'), ('Oppenheimer');
 
 INSERT INTO showtimes (movie_id, theater_id, showtime)
 VALUES
@@ -72,5 +86,3 @@ INSERT INTO seats (theater_id, seat)
 VALUES
   (1, 'A1'), (1, 'A2'), (1, 'A3'), (1, 'A4'), (1, 'A5'),
   (1, 'B1'), (1, 'B2'), (1, 'B3'), (1, 'B4'), (1, 'B5');
-
-"ILoveyou:" "sooooooooooooooo much"  "work in develop"
