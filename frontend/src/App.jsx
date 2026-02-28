@@ -118,28 +118,8 @@ function Cinema({ user }) {
       const res = await resp.json();
       if (!resp.ok) throw new Error(res.error || "booking failed");
 
-      // ask user to confirm payment
-      const ok = window.confirm(`Pay ${res.amount} from your balance?`);
-      if (!ok) {
-        await fetch(`${API}/booking/cancel`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ book_id: res.book_id })
-        });
-        return;
-      }
-
-      const payResp = await fetch(`${API}/booking/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ book_id: res.book_id })
-      });
-      const payRes = await payResp.json();
-      if (!payResp.ok) throw new Error(payRes.error || "payment failed");
-      alert("Payment confirmed");
-      // refresh user balance from server
-      refreshUser();
-      // refresh seats
+      alert("Seat held pending payment. Pay later on the Transactions page.");
+      // refresh seats to show pending status
       const s2 = await fetch(`${API}/seats?showtime_id=${showtimeId}`);
       const data = await s2.json();
       setSeats(data);
@@ -160,7 +140,7 @@ function Cinema({ user }) {
         <button onClick={() => setViewTransactions(false)} style={styles.back}>
           ⬅ Back
         </button>
-        <Transactions user={user} />
+        <Transactions user={user} refreshUser={refreshUser} />
       </>
     );
   }

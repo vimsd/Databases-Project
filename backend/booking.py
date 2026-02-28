@@ -144,6 +144,7 @@ def transactions(user_id):
 
     cursor.execute("""
         SELECT p.payment_id,
+               p.book_id,
                p.amount,
                p.payment_time,
                p.status,
