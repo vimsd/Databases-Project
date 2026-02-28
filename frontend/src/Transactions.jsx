@@ -49,6 +49,7 @@ export default function Transactions({ user, refreshUser }) {
   return (
     <div>
       <h2>My Transactions</h2>
+      {data.length === 0 && <p>No bookings yet. Book a seat first to see transactions.</p>}
       {data.map(t => (
         <div key={t.payment_id} style={{marginBottom: 8}}>
           <strong>{t.movie}</strong> - {new Date(t.showtime).toLocaleString()}<br/>
