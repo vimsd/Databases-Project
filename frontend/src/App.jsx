@@ -111,8 +111,7 @@ function Cinema({ user }) {
         body: JSON.stringify({
           user_id: user.user_id,
           showtime_id: showtimeId,
-          seat_id,
-          amount: 250
+          seat_id
         })
       });
       const res = await resp.json();
@@ -207,6 +206,7 @@ function Cinema({ user }) {
             {seats.map(s => (
               <div key={s.seat_id} style={styles.card}>
                 <h3>{s.seat}</h3>
+                <div style={{fontSize:'12px', marginBottom: '8px'}}>Price: {s.price?.toFixed(2) || 250} ฿</div>
                 {s.status === "free" && (
                   <button style={styles.button}
                     onClick={() => bookSeat(s.seat_id)}>

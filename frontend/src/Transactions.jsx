@@ -8,42 +8,63 @@ export default function Transactions({ user, refreshUser }) {
 
   const load = () => {
     fetch(`${API}/transactions/${user.user_id}`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`Server error: ${r.status}`);
+        return r.json();
+      })
       .then(arr => {
+        if (!Array.isArray(arr)) {
+          console.warn("Expected array from transactions API", arr);
+          setData([]);
+          return;
+        }
         setData(arr);
         const due = arr
           .filter(t => t.status === "Pending")
-          .reduce((sum, t) => sum + Number(t.amount), 0);
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
         setTotalDue(due);
       })
-      .catch(console.error);
+      .catch(e => {
+        console.error("Failed to load transactions:", e);
+        setData([]);
+      });
   };
 
   useEffect(load, [user]);
 
   const doPay = async (book_id) => {
-    const res = await fetch(`${API}/booking/confirm`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_id })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "pay failed");
-    alert("Payment successful");
-    refreshUser();
-    load();
+    try {
+      const res = await fetch(`${API}/booking/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ book_id })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "pay failed");
+      alert("Payment successful");
+      refreshUser();
+      load();
+    } catch (e) {
+      alert(`Payment error: ${e.message}`);
+      console.error(e);
+    }
   };
 
   const doCancel = async (book_id) => {
-    const res = await fetch(`${API}/booking/cancel`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_id })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "cancel failed");
-    alert("Booking cancelled");
-    load();
+    try {
+      const res = await fetch(`${API}/booking/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ book_id })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "cancel failed");
+      alert("Booking cancelled");
+      load();
+    } catch (e) {
+      alert(`Cancel error: ${e.message}`);
+      console.error(e);
+    }
   };
 
   return (

@@ -43,7 +43,8 @@ CREATE TABLE booking (
 CREATE TABLE seats (
     seat_id INT AUTO_INCREMENT PRIMARY KEY,
     theater_id INT NOT NULL,
-    seat VARCHAR(5) NOT NULL
+    seat VARCHAR(5) NOT NULL,
+    price DECIMAL(10,2) NOT NULL DEFAULT 250.00
 );
 
 -- BOOK_SEAT
@@ -82,7 +83,7 @@ VALUES
   (1, 1, '2026-03-01 20:30:00'),
   (2, 1, '2026-03-02 19:00:00');
 
-INSERT INTO seats (theater_id, seat)
+INSERT INTO seats (theater_id, seat, price)
 VALUES
-  (1, 'A1'), (1, 'A2'), (1, 'A3'), (1, 'A4'), (1, 'A5'),
-  (1, 'B1'), (1, 'B2'), (1, 'B3'), (1, 'B4'), (1, 'B5');
+  (1, 'A1', 250.00), (1, 'A2', 250.00), (1, 'A3', 250.00), (1, 'A4', 250.00), (1, 'A5', 250.00),
+  (1, 'B1', 250.00), (1, 'B2', 250.00), (1, 'B3', 250.00), (1, 'B4', 250.00), (1, 'B5', 250.00);

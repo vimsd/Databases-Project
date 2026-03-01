@@ -9,8 +9,8 @@ def get_seats():
 
     conn = get_connection()
     with conn.cursor() as cursor:
-        # all seats
-        cursor.execute("SELECT seat_id, seat FROM seats")
+        # all seats with prices
+        cursor.execute("SELECT seat_id, seat, price FROM seats")
         seats = cursor.fetchall()
 
         # reservations (pending/booked)

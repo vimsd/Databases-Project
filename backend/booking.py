@@ -16,6 +16,13 @@ def create_booking():
 
     try:
         with conn.cursor() as cursor:
+            # get seat price
+            cursor.execute("SELECT price FROM seats WHERE seat_id = %s", (data["seat_id"],))
+            seat = cursor.fetchone()
+            if not seat:
+                return jsonify({"error": "seat not found"}), 404
+            seat_price = float(seat["price"])
+
             # 1. create booking
             cursor.execute(
                 "INSERT INTO booking (user_id, showtime_id) VALUES (%s, %s)",
@@ -30,17 +37,17 @@ def create_booking():
                 (book_id, data["showtime_id"], data["seat_id"])
             )
 
-            # 3. payment record
+            # 3. payment record with actual seat price
             cursor.execute(
                 "INSERT INTO payments (book_id, amount, status) VALUES (%s, %s, 'Pending')",
-                (book_id, data["amount"])
+                (book_id, seat_price)
             )
 
         conn.commit()
         return jsonify({
             "message": "Booking pending",
             "book_id": book_id,
-            "amount": data["amount"],
+            "amount": seat_price,
         })
     except Exception as e:
         conn.rollback()
