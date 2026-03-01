@@ -138,6 +138,62 @@ def confirm_booking():
         conn.close()
 
 
+# ================= CONFIRM ALL (PAY ALL PENDING) =================
+@booking_bp.route("/api/booking/confirm-all", methods=["POST"])
+def confirm_all_bookings():
+    data = request.json
+    user_id = data.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT b.book_id, p.amount
+                FROM booking b
+                JOIN payments p ON p.book_id = b.book_id
+                WHERE b.user_id = %s AND p.status = 'Pending'
+                FOR UPDATE
+            """, (user_id,))
+            pending = cursor.fetchall()
+            if not pending:
+                return jsonify({"error": "no pending payments"}), 400
+
+            total = sum(float(row["amount"]) for row in pending)
+            cursor.execute(
+                "SELECT balance FROM users WHERE user_id = %s FOR UPDATE",
+                (user_id,)
+            )
+            u = cursor.fetchone()
+            if not u or float(u["balance"]) < total:
+                return jsonify({"error": "insufficient balance"}), 400
+
+            cursor.execute(
+                "UPDATE users SET balance = balance - %s WHERE user_id = %s",
+                (total, user_id)
+            )
+            for row in pending:
+                bid = row["book_id"]
+                cursor.execute(
+                    "UPDATE payments SET status = 'Paid' WHERE book_id = %s",
+                    (bid,)
+                )
+                cursor.execute(
+                    "UPDATE book_seat SET status = 'booked' WHERE book_id = %s",
+                    (bid,)
+                )
+
+        conn.commit()
+        return jsonify({"message": "All payments confirmed"})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 400
+    finally:
+        conn.close()
+
+
 # ================= CANCEL BOOKING =================
 @booking_bp.route("/api/booking/cancel", methods=["POST"])
 def cancel_booking():
@@ -157,19 +213,10 @@ def cancel_booking():
             if not pay or pay["status"] != "Pending":
                 return jsonify({"error": "cannot cancel"}), 400
 
-            # free seat instead of deleting blindly
-            cursor.execute(
-                "UPDATE book_seat SET status = 'free' WHERE book_id = %s",
-                (book_id,)
-            )
-            cursor.execute(
-                "DELETE FROM payments WHERE book_id = %s",
-                (book_id,)
-            )
-            cursor.execute(
-                "DELETE FROM booking WHERE book_id = %s",
-                (book_id,)
-            )
+            # free seat by removing book_seat row (status ENUM is 'pending'|'booked' only)
+            cursor.execute("DELETE FROM book_seat WHERE book_id = %s", (book_id,))
+            cursor.execute("DELETE FROM payments WHERE book_id = %s", (book_id,))
+            cursor.execute("DELETE FROM booking WHERE book_id = %s", (book_id,))
 
         conn.commit()
         return jsonify({"message": "Booking canceled"})
@@ -194,10 +241,12 @@ def transactions(user_id):
                        p.payment_time,
                        p.status,
                        st.showtime,
-                       s.seat
+                       s.seat,
+                       m.title AS movie
                 FROM payments p
                 JOIN booking b ON p.book_id = b.book_id
                 JOIN showtimes st ON b.showtime_id = st.showtime_id
+                JOIN movies m ON st.movie_id = m.movie_id
                 JOIN book_seat bs ON b.book_id = bs.book_id
                 JOIN seats s ON bs.seat_id = s.seat_id
                 WHERE b.user_id = %s

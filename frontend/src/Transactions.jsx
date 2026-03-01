@@ -32,12 +32,13 @@ export default function Transactions({ user, refreshUser }) {
 
   useEffect(load, [user]);
 
-  const doPay = async (book_id) => {
+  const doPayAll = async () => {
+    if (totalDue <= 0) return;
     try {
-      const res = await fetch(`${API}/booking/confirm`, {
+      const res = await fetch(`${API}/booking/confirm-all`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ book_id })
+        body: JSON.stringify({ user_id: user.user_id })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "pay failed");
@@ -77,16 +78,16 @@ export default function Transactions({ user, refreshUser }) {
           Seat: {t.seat} | Amount: {t.amount} ฿ | Status: {t.status}<br/>
           Paid at: {t.payment_time}<br/>
           {t.status === "Pending" && (
-            <>
-              <button onClick={() => doPay(t.book_id)}>Pay</button>{" "}
-              <button onClick={() => doCancel(t.book_id)}>Cancel</button>
-            </>
+            <button onClick={() => doCancel(t.book_id)}>Cancel</button>
           )}
         </div>
       ))}
       {totalDue > 0 && (
-        <div style={{marginTop:20, fontWeight:'bold'}}>
-          Total due: {totalDue} ฿
+        <div style={{marginTop: 20, fontWeight: "bold"}}>
+          Balance: {Number(user?.balance ?? 0).toFixed(2)} ฿ &nbsp;|&nbsp; Total due: {totalDue} ฿
+          <div style={{marginTop: 12}}>
+            <button onClick={doPayAll}>Pay all ({totalDue} ฿)</button>
+          </div>
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import Login from "./Login";
 import Register from "./Register";
 import Transactions from "./Transactions";
@@ -8,13 +9,21 @@ const API = import.meta.env.VITE_API || "/api";
 function App() {
   const [user, setUser] = useState(null);
   const [page, setPage] = useState("login");
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (user) setPage("cinema");
   }, [user]);
 
   const handleLogin = (userData) => {
-    setUser({ ...userData, balance: Number(userData.balance || 0) });
+    const u = { ...userData, balance: Number(userData.balance || 0) };
+    setUser(u);
+    if (location.pathname === "/transactions") {
+      // stay on /transactions so they see the page
+    } else {
+      navigate("/");
+    }
   };
 
   const refreshUser = () => {
@@ -32,55 +41,91 @@ function App() {
   const handleLogout = () => {
     setUser(null);
     setPage("login");
+    navigate("/");
   };
 
-  if (page === "login" && !user) {
-    return (
-      <div style={styles.container}>
-        <h1 style={styles.title}>🎬 Cinema System</h1>
-        <Login
-          onLogin={handleLogin}
-          switchToRegister={() => setPage("register")}
-        />
-      </div>
-    );
-  }
+  // Route: /transactions — หน้า transaction (ต้อง login ก่อน หรือแสดง login/register)
+  const transactionsEl = (
+    <div style={styles.container}>
+      {user ? (
+        <>
+          <button onClick={() => navigate("/")} style={styles.back}>
+            ⬅ Back
+          </button>
+          <Transactions user={user} refreshUser={refreshUser} />
+        </>
+      ) : page === "register" ? (
+        <>
+          <h1 style={styles.title}>🎬 Cinema System</h1>
+          <Register
+            onRegister={handleRegister}
+            switchToLogin={() => setPage("login")}
+          />
+        </>
+      ) : (
+        <>
+          <h1 style={styles.title}>🎬 Cinema System</h1>
+          <p style={{ marginBottom: 16 }}>Log in to view your transactions.</p>
+          <Login
+            onLogin={handleLogin}
+            switchToRegister={() => setPage("register")}
+          />
+        </>
+      )}
+    </div>
+  );
 
-  if (page === "register") {
-    return (
-      <div style={styles.container}>
-        <h1 style={styles.title}>🎬 Cinema System</h1>
-        <Register
-          onRegister={handleRegister}
-          switchToLogin={() => setPage("login")}
-        />
-      </div>
-    );
-  }
+  return (
+    <Routes>
+      <Route path="/transactions" element={transactionsEl} />
 
-  if (page === "cinema") {
-    return (
-      <div style={styles.container}>
-        <button onClick={handleLogout} style={{ float: "right" }}>
-          Logout
-        </button>
-        <Cinema user={user} />
-      </div>
-    );
-  }
+      <Route
+        path="/*"
+        element={
+          <>
+            {page === "login" && !user && (
+              <div style={styles.container}>
+                <h1 style={styles.title}>🎬 Cinema System</h1>
+                <Login
+                  onLogin={handleLogin}
+                  switchToRegister={() => setPage("register")}
+                />
+              </div>
+            )}
 
-  return null;
+            {page === "register" && (
+              <div style={styles.container}>
+                <h1 style={styles.title}>🎬 Cinema System</h1>
+                <Register
+                  onRegister={handleRegister}
+                  switchToLogin={() => setPage("login")}
+                />
+              </div>
+            )}
+
+            {page === "cinema" && user && (
+              <div style={styles.container}>
+                <button onClick={handleLogout} style={{ float: "right" }}>
+                  Logout
+                </button>
+                <Cinema user={user} navigate={navigate} />
+              </div>
+            )}
+          </>
+        }
+      />
+    </Routes>
+  );
 }
 
 /* ================= CINEMA ================= */
 
-function Cinema({ user }) {
+function Cinema({ user, navigate }) {
   const [movies, setMovies] = useState([]);
   const [movieId, setMovieId] = useState(null);
   const [showtimes, setShowtimes] = useState([]);
   const [showtimeId, setShowtimeId] = useState(null);
   const [seats, setSeats] = useState([]);
-  const [viewTransactions, setViewTransactions] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/movies`)
@@ -133,22 +178,11 @@ function Cinema({ user }) {
     !showtimeId ? 2 :
     3;
 
-  if (viewTransactions) {
-    return (
-      <>
-        <button onClick={() => setViewTransactions(false)} style={styles.back}>
-          ⬅ Back
-        </button>
-        <Transactions user={user} refreshUser={refreshUser} />
-      </>
-    );
-  }
-
   return (
     <>
       <h2 style={styles.welcome}>Welcome User #{user.user_id}</h2>
       <div>Balance: {Number(user.balance || 0).toFixed(2)} ฿</div>
-      <button onClick={() => setViewTransactions(true)}>My Transactions</button>
+      <button onClick={() => navigate("/transactions")}>My Transactions</button>
 
       {/* STEP INDICATOR */}
       <div style={styles.steps}>
