@@ -25,7 +25,9 @@ services:
 
   # -------- Backend (Flask) --------
   backend:
-    build: ./backend
+    build:
+      context: .          # build from project root so we can copy frontend folder
+      dockerfile: backend/Dockerfile
     container_name: cinema_backend
     ports:
       - "5000:5000"
@@ -39,20 +41,22 @@ services:
       DB_NAME: cinema_db
       MONGO_URI: mongodb://mongo_db:27017/cinema_logs
 
-  # -------- Frontend (Vite Dev เหมือน npm run dev) --------
-  # -------- Frontend (Vite Dev เหมือน npm run dev) --------
-  frontend:
-    image: node:22-alpine
-    container_name: cinema_frontend
-    working_dir: /app
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: sh -c "npm install && npm run dev -- --host"
-    depends_on:
-      - backend
+  # -------- Frontend (now served by backend) --------
+  # frontend server is no longer needed because the backend image builds
+  # the React app and serves the static files.  Keep this commented in case
+  # you want to run the Vite dev server separately during development.
+#  frontend:
+#    image: node:22-alpine
+#    container_name: cinema_frontend
+#    working_dir: /app
+#    ports:
+#      - "5173:5173"
+#    volumes:
+#      - ./frontend:/app
+#      - /app/node_modules
+#    command: sh -c "npm install && npm run dev -- --host"
+#    depends_on:
+#      - backend
 
 volumes:
   mysql_data:
