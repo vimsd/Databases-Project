@@ -206,7 +206,7 @@ function Cinema({ user }) {
             {seats.map(s => (
               <div key={s.seat_id} style={styles.card}>
                 <h3>{s.seat}</h3>
-                <div style={{fontSize:'12px', marginBottom: '8px'}}>Price: {s.price?.toFixed(2) || 250} ฿</div>
+                <div style={{fontSize:'12px', marginBottom: '8px'}}>Price: {Number(s.price ?? 250).toFixed(2)} ฿ </div>
                 {s.status === "free" && (
                   <button style={styles.button}
                     onClick={() => bookSeat(s.seat_id)}>
