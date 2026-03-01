@@ -1,25 +1,24 @@
+# --- frontend builder stage -----------------------------------------------
+FROM node:20-slim AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+COPY frontend/ .
+RUN npm ci && npm run build
+
+# --- python runtime stage --------------------------------------------------
 FROM python:3.10-slim
+WORKDIR /app/backend
 
-# install node so we can build the frontend during image build
-RUN apt-get update && apt-get install -y curl gnupg && \
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# install Python dependencies from backend/requirements.txt
+# python deps
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# copy frontend source and build it before copying backend code so
-# that changes to backend files don't invalidate the frontend build layer
-COPY frontend ./frontend
-RUN cd frontend && npm install && npm run build
+# copy backend source directly into workdir
+COPY backend/ .
 
-# copy backend application files only
-COPY backend ./backend
+# copy built frontend from builder into /app/frontend/dist
+WORKDIR /app
+COPY --from=frontend-builder /app/frontend/dist frontend/dist
 WORKDIR /app/backend
-
 
 CMD ["python", "app.py"]
