@@ -8,14 +8,18 @@ RUN apt-get update && apt-get install -y curl gnupg && \
 
 WORKDIR /app
 
-COPY requirements.txt .
+# install Python dependencies from backend/requirements.txt
+COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# copy frontend source and build it
+# copy frontend source and build it before copying backend code so
+# that changes to backend files don't invalidate the frontend build layer
 COPY frontend ./frontend
 RUN cd frontend && npm install && npm run build
 
-# copy rest of backend code
-COPY . .
+# copy backend application files only
+COPY backend ./backend
+WORKDIR /app/backend
+
 
 CMD ["python", "app.py"]
