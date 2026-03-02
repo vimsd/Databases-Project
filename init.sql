@@ -3,7 +3,6 @@ DROP TABLE IF EXISTS book_seat;
 DROP TABLE IF EXISTS booking;
 DROP TABLE IF EXISTS seats;
 DROP TABLE IF EXISTS showtimes;
-DROP TABLE IF EXISTS movies;
 DROP TABLE IF EXISTS users;
 
 -- USERS
@@ -14,19 +13,12 @@ CREATE TABLE users (
     balance DECIMAL(10,2) NOT NULL DEFAULT 0
 );
 
--- MOVIES
-CREATE TABLE movies (
-    movie_id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL
-);
-
 -- SHOWTIMES
 CREATE TABLE showtimes (
     showtime_id INT AUTO_INCREMENT PRIMARY KEY,
-    movie_id INT NOT NULL,
+    movie_id VARCHAR(50) NOT NULL,  -- References MongoDB ObjectId
     theater_id INT NOT NULL,
-    showtime DATETIME NOT NULL,
-    FOREIGN KEY (movie_id) REFERENCES movies(movie_id)
+    showtime DATETIME NOT NULL
 );
 
 -- BOOKING
@@ -74,14 +66,9 @@ CREATE TABLE payments (
 INSERT INTO users (email, password, balance)
 VALUES ('user1@gmail.com', 'u1_pass', 1000.00);
 
--- sample movies
-INSERT INTO movies (title) VALUES ('Dune'), ('Oppenheimer');
+-- Note: movies and showtimes are now inserted via backend/seed.py 
+-- for mapping MongoDB string IDs.
 
-INSERT INTO showtimes (movie_id, theater_id, showtime)
-VALUES
-  (1, 1, '2026-03-01 18:00:00'),
-  (1, 1, '2026-03-01 20:30:00'),
-  (2, 1, '2026-03-02 19:00:00');
 
 INSERT INTO seats (theater_id, seat, price)
 VALUES

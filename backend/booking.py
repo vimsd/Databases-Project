@@ -10,8 +10,8 @@ def create_booking():
     if not data or not all(k in data for k in ("user_id", "showtime_id", "seat_id")):
         return jsonify({"error": "missing required fields"}), 400
 
-    conn = get_connection()
     try:
+        conn = get_connection()
         with conn.cursor() as cursor:
             # get seat price
             cursor.execute(
@@ -66,10 +66,10 @@ def create_booking():
         }), 201
 
     except Exception as e:
-        conn.rollback()
-        return jsonify({"error": str(e)}), 400
+        if 'conn' in locals(): conn.rollback()
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
-        conn.close()
+        if 'conn' in locals(): conn.close()
 
 
 # ================= CONFIRM BOOKING =================
@@ -80,8 +80,8 @@ def confirm_booking():
     if not book_id:
         return jsonify({"error": "book_id required"}), 400
 
-    conn = get_connection()
     try:
+        conn = get_connection()
         with conn.cursor() as cursor:
             # lock payment
             cursor.execute("""
@@ -132,10 +132,10 @@ def confirm_booking():
         return jsonify({"message": "Payment confirmed"})
 
     except Exception as e:
-        conn.rollback()
-        return jsonify({"error": str(e)}), 400
+        if 'conn' in locals(): conn.rollback()
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
-        conn.close()
+        if 'conn' in locals(): conn.close()
 
 
 # ================= CONFIRM ALL (PAY ALL PENDING) =================
@@ -241,18 +241,39 @@ def transactions(user_id):
                        p.payment_time,
                        p.status,
                        st.showtime,
-                       s.seat,
-                       m.title AS movie
+                       st.movie_id,
+                       s.seat
                 FROM payments p
                 JOIN booking b ON p.book_id = b.book_id
                 JOIN showtimes st ON b.showtime_id = st.showtime_id
-                JOIN movies m ON st.movie_id = m.movie_id
                 JOIN book_seat bs ON b.book_id = bs.book_id
                 JOIN seats s ON bs.seat_id = s.seat_id
                 WHERE b.user_id = %s
                 ORDER BY p.payment_time DESC
             """, (user_id,))
             result = cursor.fetchall()
+            
+        # Fetch movie titles from MongoDB
+        if result:
+            from db import get_mongo_db
+            from bson.objectid import ObjectId
+            mongo_db = get_mongo_db()
+            movie_ids = list(set([str(r["movie_id"]) for r in result if r.get("movie_id")]))
+            
+            # Map valid ObjectIds to their titles
+            movie_map = {}
+            for m_id in movie_ids:
+                try:
+                    obj_id = ObjectId(m_id)
+                    movie = mongo_db.movies.find_one({"_id": obj_id})
+                    if movie:
+                        movie_map[m_id] = movie.get("title", "Unknown Movie")
+                except Exception:
+                    movie_map[m_id] = "Unknown Movie"
+
+            # Attach titles to results
+            for row in result:
+                row["movie"] = movie_map.get(str(row["movie_id"]), "Unknown Movie")
 
         return jsonify(result)
     finally:

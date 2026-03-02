@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import Login from "./Login";
 import Register from "./Register";
 import Transactions from "./Transactions";
+import Admin from "./Admin";
 
 const API = import.meta.env.VITE_API || "/api";
 
@@ -78,6 +79,7 @@ function App() {
   return (
     <Routes>
       <Route path="/transactions" element={transactionsEl} />
+      <Route path="/admin" element={<Admin />} />
 
       <Route
         path="/*"
@@ -105,9 +107,14 @@ function App() {
 
             {page === "cinema" && user && (
               <div style={styles.container}>
-                <button onClick={handleLogout} style={{ float: "right" }}>
-                  Logout
-                </button>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+                  <button onClick={() => navigate("/admin")} style={{ background: '#ffc107', color: '#000', padding: '6px 12px', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                    ⚙️ Admin Panel
+                  </button>
+                  <button onClick={handleLogout} style={{ padding: '6px 12px', cursor: 'pointer' }}>
+                    Logout
+                  </button>
+                </div>
                 <Cinema user={user} navigate={navigate} />
               </div>
             )}
@@ -175,8 +182,8 @@ function Cinema({ user, navigate }) {
 
   const step =
     !movieId ? 1 :
-    !showtimeId ? 2 :
-    3;
+      !showtimeId ? 2 :
+        3;
 
   return (
     <>
@@ -240,7 +247,7 @@ function Cinema({ user, navigate }) {
             {seats.map(s => (
               <div key={s.seat_id} style={styles.card}>
                 <h3>{s.seat}</h3>
-                <div style={{fontSize:'12px', marginBottom: '8px'}}>Price: {Number(s.price ?? 250).toFixed(2)} ฿ </div>
+                <div style={{ fontSize: '12px', marginBottom: '8px' }}>Price: {Number(s.price ?? 250).toFixed(2)} ฿ </div>
                 {s.status === "free" && (
                   <button style={styles.button}
                     onClick={() => bookSeat(s.seat_id)}>

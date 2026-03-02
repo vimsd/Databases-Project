@@ -13,8 +13,8 @@ def register():
     email = data['email']
     password = data['password']
 
-    conn = get_connection()
     try:
+        conn = get_connection()
         with conn.cursor() as cursor:
             cursor.execute("SELECT user_id FROM users WHERE email = %s", (email,))
             existing_user = cursor.fetchone()
@@ -35,10 +35,12 @@ def register():
         return jsonify({"message": "Register success", "user_id": user_id, "balance": 1000.00}), 201
 
     except Exception as e:
-        conn.rollback()
+        if 'conn' in locals():
+            conn.rollback()
         return jsonify({"message": f"Error: {str(e)}"}), 500
     finally:
-        conn.close()
+        if 'conn' in locals():
+            conn.close()
 
 
 @auth_bp.route('/api/login', methods=['POST'])
@@ -50,8 +52,8 @@ def login():
     email = data['email']
     password = data['password']
 
-    conn = get_connection()
     try:
+        conn = get_connection()
         with conn.cursor() as cursor:
             cursor.execute("SELECT user_id, password, balance FROM users WHERE email = %s", (email,))
             user = cursor.fetchone()
@@ -59,7 +61,9 @@ def login():
                 return jsonify({"message": "Invalid credentials"}), 401
 
             from werkzeug.security import check_password_hash
-            if not check_password_hash(user['password'], password):
+            # Check if password matches (handling potential plain text from init.sql for fallback, though hashing is preferred)
+            pwd_hash = user['password']
+            if not (check_password_hash(pwd_hash, password) or pwd_hash == password):
                 return jsonify({"message": "Invalid credentials"}), 401
 
             # do not expose password hash, but include balance
@@ -68,7 +72,10 @@ def login():
                 "email": email,
                 "balance": user.get('balance', 0)
             })
+    except Exception as e:
+        return jsonify({"message": f"Database error: {str(e)}"}), 500
     finally:
-        conn.close()
+        if 'conn' in locals():
+            conn.close()
 
 
