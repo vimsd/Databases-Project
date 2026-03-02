@@ -6,6 +6,7 @@ from booking import booking_bp
 from showtimes import showtimes_bp
 from seats import seats_bp
 from auth import auth_bp
+from mongo_routes import mongo_bp
 
 app = Flask(__name__)
 CORS(app)  # 👈 สำคัญมาก
@@ -16,6 +17,7 @@ app.register_blueprint(users_bp)
 app.register_blueprint(booking_bp)
 app.register_blueprint(showtimes_bp)
 app.register_blueprint(seats_bp)
+app.register_blueprint(mongo_bp)
 
 
 # serve frontend build if it exists (so backend can be the single entrypoint)

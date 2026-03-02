@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://cinema_backend:5000', // ⭐ ชื่อ service backend
+        target: 'http://localhost:5000', // ⭐ เปลี่ยนเป็น localhost ถ้ากะจะรัน npm run dev นอก Docker
         changeOrigin: true,
         secure: false,
       },

@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import Login from "./Login";
 import Register from "./Register";
 import Transactions from "./Transactions";
+import Admin from "./Admin";
 
 const API = import.meta.env.VITE_API || "/api";
 
@@ -259,7 +260,7 @@ function Cinema({ user, navigate, searchTerm }) {
   };
 
   const filteredMovies = movies.filter(m =>
-    m.title.toLowerCase().includes(searchTerm.toLowerCase())
+    m.title.toLowerCase().includes(searchTerm?.toLowerCase() || "")
   );
 
   const selectedMovie = movies.find(m => m.movie_id === movieId);
@@ -443,11 +444,10 @@ function Cinema({ user, navigate, searchTerm }) {
                   <button
                     disabled={selectedSeats.length === 0}
                     onClick={confirmSelection}
-                    className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
-                      selectedSeats.length
-                        ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20'
-                        : 'bg-neutral-dark text-neutral-muted cursor-not-allowed border border-neutral-dark/50'
-                    }`}
+                    className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${selectedSeats.length
+                      ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20'
+                      : 'bg-neutral-dark text-neutral-muted cursor-not-allowed border border-neutral-dark/50'
+                      }`}
                   >
                     <span>Confirm Booking</span>
                     <span className="material-symbols-outlined">arrow_forward</span>

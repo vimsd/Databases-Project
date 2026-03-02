@@ -7,21 +7,24 @@ seats_bp = Blueprint("seats", __name__)
 def get_seats():
     showtime_id = request.args.get("showtime_id")
 
-    conn = get_connection()
-    with conn.cursor() as cursor:
-        # all seats with prices
-        cursor.execute("SELECT seat_id, seat, price FROM seats")
-        seats = cursor.fetchall()
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            # all seats with prices
+            cursor.execute("SELECT seat_id, seat, price FROM seats")
+            seats = cursor.fetchall()
 
-        # reservations (pending/booked)
-        cursor.execute("""
-            SELECT seat_id, status
-            FROM book_seat
-            WHERE showtime_id = %s
-        """, (showtime_id,))
-        reserved = {row["seat_id"]: row["status"] for row in cursor.fetchall()}
-
-    conn.close()
+            # reservations (pending/booked)
+            cursor.execute("""
+                SELECT seat_id, status
+                FROM book_seat
+                WHERE showtime_id = %s
+            """, (showtime_id,))
+            reserved = {row["seat_id"]: row["status"] for row in cursor.fetchall()}
+    except Exception as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+    finally:
+        if 'conn' in locals(): conn.close()
 
     for seat in seats:
         st = reserved.get(seat["seat_id"])
