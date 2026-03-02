@@ -257,3 +257,87 @@ def transactions(user_id):
         return jsonify(result)
     finally:
         conn.close()
+# ================= ADMIN: LIST ALL BOOKINGS =================
+@booking_bp.route("/api/admin/bookings")
+def list_bookings():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT p.payment_id,
+                       p.book_id,
+                       p.amount,
+                       p.payment_time,
+                       p.status,
+                       u.email as user_email,
+                       m.title AS movie,
+                       s.seat
+                FROM payments p
+                JOIN booking b ON p.book_id = b.book_id
+                JOIN users u ON b.user_id = u.user_id
+                JOIN showtimes st ON b.showtime_id = st.showtime_id
+                JOIN movies m ON st.movie_id = m.movie_id
+                JOIN book_seat bs ON b.book_id = bs.book_id
+                JOIN seats s ON bs.seat_id = s.seat_id
+                ORDER BY p.payment_time DESC
+            """)
+            result = cursor.fetchall()
+        return jsonify(result)
+    finally:
+        conn.close()
+
+
+# ================= ADMIN: REFUND BOOKING =================
+@booking_bp.route("/api/admin/booking/refund", methods=["POST"])
+def refund_booking():
+    data = request.json
+    book_id = data.get("book_id")
+    if not book_id:
+        return jsonify({"error": "book_id required"}), 400
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 1. Get payment and user details
+            cursor.execute("""
+                SELECT p.amount, p.status, b.user_id
+                FROM payments p
+                JOIN booking b ON p.book_id = b.book_id
+                WHERE p.book_id = %s
+                FOR UPDATE
+            """, (book_id,))
+            payment = cursor.fetchone()
+            
+            if not payment:
+                return jsonify({"error": "Payment not found"}), 404
+            
+            if payment["status"] != "Paid":
+                # If it's pending, just cancel it normally
+                cursor.execute("DELETE FROM book_seat WHERE book_id = %s", (book_id,))
+                cursor.execute("DELETE FROM payments WHERE book_id = %s", (book_id,))
+                cursor.execute("DELETE FROM booking WHERE book_id = %s", (book_id,))
+                conn.commit()
+                return jsonify({"message": "Pending booking cancelled (no refund needed)"})
+
+            # 2. Refund balance
+            amount = float(payment["amount"])
+            user_id = payment["user_id"]
+            
+            cursor.execute(
+                "UPDATE users SET balance = balance + %s WHERE user_id = %s",
+                (amount, user_id)
+            )
+
+            # 3. Remove booking records to free seat
+            cursor.execute("DELETE FROM book_seat WHERE book_id = %s", (book_id,))
+            cursor.execute("DELETE FROM payments WHERE book_id = %s", (book_id,))
+            cursor.execute("DELETE FROM booking WHERE book_id = %s", (book_id,))
+
+        conn.commit()
+        return jsonify({"message": f"Booking refunded {amount} ฿ and cancelled successfully"})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 400
+    finally:
+        conn.close()

@@ -31,7 +31,7 @@ def get_user(user_id):
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT user_id, email, balance FROM users WHERE user_id = %s",
+                "SELECT user_id, email, balance, role FROM users WHERE user_id = %s",
                 (user_id,)
             )
             user = cursor.fetchone()
@@ -52,6 +52,38 @@ def delete_user(user_id):
                 return jsonify({"error": "not found"}), 404
         conn.commit()
         return jsonify({"message": "User deleted"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 400
+    finally:
+        conn.close()
+@users_bp.route("/api/admin/users", methods=["GET"])
+def list_users():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT user_id, email, balance, role FROM users")
+            users = cursor.fetchall()
+            return jsonify(users)
+    finally:
+        conn.close()
+
+
+@users_bp.route("/api/admin/users/<int:user_id>/balance", methods=["PUT"])
+def update_balance(user_id):
+    data = request.json
+    if data is None or "balance" not in data:
+        return jsonify({"error": "balance required"}), 400
+    
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE users SET balance = %s WHERE user_id = %s",
+                (data["balance"], user_id)
+            )
+        conn.commit()
+        return jsonify({"message": "Balance updated"})
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 400

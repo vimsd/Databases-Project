@@ -11,7 +11,8 @@ CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    balance DECIMAL(10,2) NOT NULL DEFAULT 0
+    balance DECIMAL(10,2) NOT NULL DEFAULT 0,
+    role ENUM('user', 'admin') NOT NULL DEFAULT 'user'
 );
 
 -- MOVIES
@@ -71,8 +72,10 @@ CREATE TABLE payments (
 );
 
 
-INSERT INTO users (email, password, balance)
-VALUES ('user1@gmail.com', 'u1_pass', 1000.00);
+INSERT INTO users (email, password, balance, role)
+VALUES 
+('user1@gmail.com', 'scrypt:32768:8:1$EKCqQ3fQPSy0kE6C$9f48604b262899df4ce9baaf4d4e52d67bbf6f27977b3bf850e3d1ede5ed4eb9ed9d2a9676df4f37d9e356f90b6188c9ced54e93acfee0579e9cbbc4205182d5', 1000.00, 'user'),
+('admin@gmail.com', 'scrypt:32768:8:1$wh46ee9mG9A2fpT5$3403c64152181e24c35ed4a91ab63b5cd0d38b7c472dd226c61eaaf7ef44a80579a5e6354e46d94b8399feba212b1f6abecc8fdd5e50f326d7f8f412a430893c', 0.00, 'admin');
 
 -- sample movies
 INSERT INTO movies (title) VALUES ('Dune'), ('Oppenheimer');

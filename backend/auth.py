@@ -53,7 +53,7 @@ def login():
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT user_id, password, balance FROM users WHERE email = %s", (email,))
+            cursor.execute("SELECT user_id, password, balance, role FROM users WHERE email = %s", (email,))
             user = cursor.fetchone()
             if not user:
                 return jsonify({"message": "Invalid credentials"}), 401
@@ -62,11 +62,12 @@ def login():
             if not check_password_hash(user['password'], password):
                 return jsonify({"message": "Invalid credentials"}), 401
 
-            # do not expose password hash, but include balance
+            # do not expose password hash, but include balance and role
             return jsonify({
                 "user_id": user['user_id'],
                 "email": email,
-                "balance": user.get('balance', 0)
+                "balance": user.get('balance', 0),
+                "role": user.get('role', 'user')
             })
     finally:
         conn.close()
