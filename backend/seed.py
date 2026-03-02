@@ -17,21 +17,49 @@ def get_mongo_db():
     mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/cinema_logs")
     client = MongoClient(mongo_uri)
     return client.get_database()
+                    
+import time
 
 def seed_database():
-    print("Connecting to databases...")
+    print("Checking if database needs seeding...")
+    
+    max_retries = 10
+    retry_delay = 5
+    
+    mongo_db = None
+    mysql_conn = None
+    
+    # Retry loop to wait for DBs to be ready (especially for fresh docker-compose up)
+    for i in range(max_retries):
+        try:
+            print(f"Connection attempt {i+1}/{max_retries}...")
+            mongo_db = get_mongo_db()
+            mysql_conn = get_mysql_connection()
+            # Test MySQL connection
+            with mysql_conn.cursor() as cursor:
+                cursor.execute("SELECT 1")
+            print("Databases are ready!")
+            break
+        except Exception as e:
+            print(f"Wait for DB... ({e})")
+            if i < max_retries - 1:
+                time.sleep(retry_delay)
+            else:
+                print("Could not connect to database after several attempts. Skipping seed.")
+                return
+
     try:
-        mongo_db = get_mongo_db()
-        mysql_conn = get_mysql_connection()
+        # Check if movies already exist
+        if mongo_db.movies.count_documents({}) > 0:
+            print("Database already contains movies. Skipping seed to prevent data loss.")
+            return
+
     except Exception as e:
-        print(f"Connection failed: {e}")
+        print(f"Seeding check failed: {e}")
         return
 
-    print("Cleaning up old movies from MongoDB...")
-    mongo_db.movies.delete_many({})
-
     # 1. Insert Movies into MongoDB
-    print("Inserting movies into MongoDB...")
+    print("Inserting default movies into MongoDB...")
     movies_data = [
         {
             "title": "Dune",

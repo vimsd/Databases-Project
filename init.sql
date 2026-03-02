@@ -10,7 +10,8 @@ CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    balance DECIMAL(10,2) NOT NULL DEFAULT 0
+    balance DECIMAL(10,2) NOT NULL DEFAULT 0,
+    role ENUM('user', 'admin') NOT NULL DEFAULT 'user'
 );
 
 -- SHOWTIMES
@@ -63,8 +64,10 @@ CREATE TABLE payments (
 );
 
 
-INSERT INTO users (email, password, balance)
-VALUES ('user1@gmail.com', 'u1_pass', 1000.00);
+INSERT INTO users (email, password, balance, role)
+VALUES 
+('admin@gmail.com', 'scrypt:32768:8:1$lFv0CK660arMNLIG$c6a8cabb11962e36ef89eeb7c3001a1cfbbd9f5a5f7d52a528c83a2f4887e4eab84fbdc5606405154fb57c7b1a1754e5ad7248a41ab93df50cf57a8f16471d13', 0.00, 'admin');
+
 
 -- Note: movies and showtimes are now inserted via backend/seed.py 
 -- for mapping MongoDB string IDs.
@@ -73,4 +76,4 @@ VALUES ('user1@gmail.com', 'u1_pass', 1000.00);
 INSERT INTO seats (theater_id, seat, price)
 VALUES
   (1, 'A1', 250.00), (1, 'A2', 250.00), (1, 'A3', 250.00), (1, 'A4', 250.00), (1, 'A5', 250.00),
-  (1, 'B1', 250.00), (1, 'B2', 250.00), (1, 'B3', 250.00), (1, 'B4', 250.00), (1, 'B5', 250.00);
+  (0, 'B1', 250.00), (1, 'B2', 250.00), (1, 'B3', 250.00), (1, 'B4', 250.00), (1, 'B5', 250.00);

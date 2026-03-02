@@ -1,0 +1,179 @@
+[33mcommit c74c01fe72feffe30d470576903c61bb7233246a[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Mon Mar 2 11:17:37 2026 +0700
+
+    earth is here
+
+[33mcommit 7b6b0bbdebdabbffa5a2aef286795ca6e4c7b1ad[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sun Mar 1 15:38:58 2026 +0700
+
+    fixed transaction page cancel botton
+
+[33mcommit 0014b2f63c1ec54140e5a23b54b4bcedea2f909d[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sun Mar 1 14:59:12 2026 +0700
+
+    edit frontend
+
+[33mcommit 0f0612cf2123a7fdb27bdd7a4cb37901bc94cc9c[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sun Mar 1 14:18:38 2026 +0700
+
+    Add seat prices, fix transactions page error handling, show prices in UI
+
+[33mcommit 73b5997391fea62aa31b7edb55a8d893d8a120d3[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sun Mar 1 14:11:32 2026 +0700
+
+    Dockerfile: correct paths and working directories
+
+[33mcommit 206bdc3b407925d82cc05e2ccb6b4eb43bea469a[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sun Mar 1 14:01:35 2026 +0700
+
+    Dockerfile: use backend/requirements.txt and copy backend directory
+
+[33mcommit 0fe16d057db08ff483169188ab89f7827835813b[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sun Mar 1 13:58:53 2026 +0700
+
+    Fix backend build context to include frontend folder
+
+[33mcommit d9b374d15764f35688ab7c5e3c8e09ff9b72947c[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sun Mar 1 13:54:54 2026 +0700
+
+    Serve built frontend from backend; add Node build step in Dockerfile
+
+[33mcommit 4fd466af3be1b7a5666781955155d76af50ff290[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sun Mar 1 00:06:52 2026 +0700
+
+    UX: show message when no transactions available
+
+[33mcommit d9816981dfa548b76272a65241cb5e906d88908c[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sat Feb 28 23:58:37 2026 +0700
+
+    Cleanup: remove unused frontend/api.js
+
+[33mcommit 2e0a1d3fb34c911acab88d760aa80906fcac82f1[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sat Feb 28 23:57:53 2026 +0700
+
+    Booking API: remove balance check to allow pending holds regardless of funds
+
+[33mcommit 47b00447b6a634805f4b0f26439e26a65fc83dff[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sat Feb 28 23:57:06 2026 +0700
+
+    Improve transaction page: pay/cancel buttons, total due; simplify booking; remove old HTML
+
+[33mcommit b319ad39d5c7c1eedb7ddc6cc11375a0f3962f11[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sat Feb 28 23:47:06 2026 +0700
+
+    Fix: normalize user.balance to Number to avoid render crash after login
+
+[33mcommit 8a8a8ed6ca601f0cf5d2bc293aa414c774ec7343[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Sat Feb 28 23:40:02 2026 +0700
+
+    Fix: remove duplicate transactions endpoint to avoid Flask endpoint overwrite
+
+[33mcommit 9b259e057d1d1b30922e28c9068ff6bb01217afc[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Fri Feb 27 15:16:05 2026 +0700
+
+    work in develop
+
+[33mcommit 2138cf92a48190a1aedd3a4884f80e7fc1a2d68b[m[33m ([m[1;31morigin/develop[m[33m, [m[1;32mdevelop[m[33m)[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Fri Feb 27 15:07:37 2026 +0700
+
+    branch develop
+
+[33mcommit e24a486fbc7b431dc6bffb6574d2c7dbb54459fb[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Thu Feb 26 23:53:38 2026 +0700
+
+    fix docker and add show&seat to database
+
+[33mcommit 8189cac5f33673d5958d6ec9a7ceaded7232a7eb[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Thu Feb 26 23:04:39 2026 +0700
+
+    Fix web page
+
+[33mcommit 365631eb9b205a0049b7ad8369e2aa0af78d61d5[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Thu Feb 26 22:54:10 2026 +0700
+
+    add showtime
+
+[33mcommit 79eb8bba05ead4b92b8d895033a6acc527db2c92[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Thu Feb 26 22:34:57 2026 +0700
+
+    add transaction
+
+[33mcommit 6ae15315d267b1af315eb21ac2094374630624e3[m
+Author: vimsd <cheertahh@gmail.com>
+Date:   Thu Feb 26 21:37:25 2026 +0700
+
+    edit init.sql
+
+[33mcommit 5e0700bba6a64e553c2f7cd641ff666f382006c0[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Thu Feb 26 20:53:41 2026 +0700
+
+    movie9
+
+[33mcommit 1d0978fdd04f59d3b765af6dbd94cdd732c4281a[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Wed Feb 25 10:12:02 2026 +0700
+
+    movie8
+
+[33mcommit 326cef87d221150e1645128dad5b14cced40dfc7[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Wed Feb 25 10:00:40 2026 +0700
+
+    movie7
+
+[33mcommit bd6d4d66fcb1b39e3540401339639d50fad37de8[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Wed Feb 25 09:52:34 2026 +0700
+
+    movie6
+
+[33mcommit d4265e9eb70fba1924a9b36871eec1493a2cd845[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Wed Feb 25 04:37:52 2026 +0700
+
+    movie5
+
+[33mcommit a9106a9379026b0bf37d32bd9199f46e9aeb9f3d[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Wed Feb 25 03:19:43 2026 +0700
+
+    movie4
+
+[33mcommit 532c3c1e2b1a20bcc9aba15f8981ce66413c7a3c[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Wed Feb 25 02:49:02 2026 +0700
+
+    movie3
+
+[33mcommit a20bc4894fc985c8c6692411d6860abaf6eb38d4[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Wed Feb 25 02:28:38 2026 +0700
+
+    movie2
+
+[33mcommit 7b4cf479e4e6f354b463f8bd38d8e4443f531ba2[m
+Author: Earthkodyai <earth3joy@gmail.com>
+Date:   Wed Feb 25 02:19:26 2026 +0700
+
+    movie1

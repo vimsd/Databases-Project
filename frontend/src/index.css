@@ -1,13 +1,47 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-body {
-  margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #020617; /* Slate-950 */
+@theme {
+  --color-primary: #ea2a33;
+  --color-background-light: #f8f6f6;
+  --color-background-dark: #181111;
+  --color-neutral-dark: #312626;
+  /* Adjusted for better contrast than template's 382929 */
+  --color-neutral-muted: #b89d9f;
+}
+
+@layer base {
+  body {
+    @apply bg-background-dark font-['Spline_Sans'] text-slate-100 min-h-screen;
+    margin: 0;
+  }
+}
+
+/* Custom CineBook Styles */
+.cinema-screen-curve {
+  height: 12px;
+  width: 80%;
+  margin: 0 auto;
+  background: linear-gradient(180deg, rgba(234, 42, 51, 0.4) 0%, rgba(234, 42, 51, 0) 100%);
+  border-top: 4px solid #ea2a33;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  filter: drop-shadow(0 -5px 15px rgba(234, 42, 51, 0.5));
+}
+
+.seat-grid {
+  perspective: 1000px;
+}
+
+.seat-row {
+  transform: rotateX(10deg);
+}
+
+.layout-container {
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
 #root {
-  color: white;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }

@@ -21,4 +21,4 @@ WORKDIR /app
 COPY --from=frontend-builder /app/frontend/dist frontend/dist
 WORKDIR /app/backend
 
-CMD ["python", "app.py"]
+CMD ["sh", "-c", "python seed.py && python app.py"]

@@ -3,9 +3,13 @@ from db import get_connection
 
 booking_bp = Blueprint("booking", __name__)
 
-# ================= CREATE BOOKING =================
+# ================= CREATE BOOKING (SINGLE SEAT) =================
 @booking_bp.route("/api/booking", methods=["POST"])
 def create_booking():
+    """
+    Legacy endpoint for creating a booking for a single seat.
+    New UI will mostly use /api/booking/bulk for multi-seat flows.
+    """
     data = request.json
     if not data or not all(k in data for k in ("user_id", "showtime_id", "seat_id")):
         return jsonify({"error": "missing required fields"}), 400
@@ -30,7 +34,8 @@ def create_booking():
                 FOR UPDATE
             """, (data["showtime_id"], data["seat_id"]))
             existing = cursor.fetchone()
-            if existing and existing["status"] != "free":
+            # any existing row means seat is already held or booked
+            if existing:
                 return jsonify({"error": "seat already taken"}), 409
 
             # create booking
@@ -70,6 +75,89 @@ def create_booking():
         return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         if 'conn' in locals(): conn.close()
+
+
+# ================= CREATE MULTIPLE BOOKINGS (MULTI-SEAT) =================
+@booking_bp.route("/api/booking/bulk", methods=["POST"])
+def create_booking_bulk():
+    """
+    Create bookings for multiple seats in a single showtime for a user.
+    Each seat becomes its own booking + payment, so that payments
+    still map 1:1 with seats while allowing a single confirmation flow.
+    """
+    data = request.json or {}
+    user_id = data.get("user_id")
+    showtime_id = data.get("showtime_id")
+    seat_ids = data.get("seat_ids") or []
+
+    if not user_id or not showtime_id or not isinstance(seat_ids, list) or not seat_ids:
+        return jsonify({"error": "user_id, showtime_id and seat_ids[] are required"}), 400
+
+    conn = get_connection()
+    created = []
+    try:
+        with conn.cursor() as cursor:
+            for seat_id in seat_ids:
+                # get seat price
+                cursor.execute(
+                    "SELECT price FROM seats WHERE seat_id = %s",
+                    (seat_id,)
+                )
+                seat = cursor.fetchone()
+                if not seat:
+                    conn.rollback()
+                    return jsonify({"error": f"seat not found: {seat_id}"}), 404
+                seat_price = float(seat["price"])
+
+                # check seat availability (lock)
+                cursor.execute("""
+                    SELECT status FROM book_seat
+                    WHERE showtime_id = %s AND seat_id = %s
+                    FOR UPDATE
+                """, (showtime_id, seat_id))
+                existing = cursor.fetchone()
+                if existing:
+                    conn.rollback()
+                    return jsonify({"error": f"seat already taken: {seat_id}"}), 409
+
+                # create booking
+                cursor.execute(
+                    "INSERT INTO booking (user_id, showtime_id) VALUES (%s, %s)",
+                    (user_id, showtime_id)
+                )
+                book_id = cursor.lastrowid
+
+                # hold seat
+                cursor.execute(
+                    """
+                    INSERT INTO book_seat (book_id, showtime_id, seat_id, status)
+                    VALUES (%s, %s, %s, 'pending')
+                    """,
+                    (book_id, showtime_id, seat_id)
+                )
+
+                # payment record
+                cursor.execute(
+                    """
+                    INSERT INTO payments (book_id, amount, status)
+                    VALUES (%s, %s, 'Pending')
+                    """,
+                    (book_id, seat_price)
+                )
+
+                created.append({"book_id": book_id, "seat_id": seat_id, "amount": seat_price})
+
+        conn.commit()
+        return jsonify({
+            "message": "Bookings pending",
+            "items": created
+        }), 201
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 400
+    finally:
+        conn.close()
 
 
 # ================= CONFIRM BOOKING =================
@@ -276,5 +364,89 @@ def transactions(user_id):
                 row["movie"] = movie_map.get(str(row["movie_id"]), "Unknown Movie")
 
         return jsonify(result)
+    finally:
+        conn.close()
+# ================= ADMIN: LIST ALL BOOKINGS =================
+@booking_bp.route("/api/admin/bookings")
+def list_bookings():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT p.payment_id,
+                       p.book_id,
+                       p.amount,
+                       p.payment_time,
+                       p.status,
+                       u.email as user_email,
+                       m.title AS movie,
+                       s.seat
+                FROM payments p
+                JOIN booking b ON p.book_id = b.book_id
+                JOIN users u ON b.user_id = u.user_id
+                JOIN showtimes st ON b.showtime_id = st.showtime_id
+                JOIN movies m ON st.movie_id = m.movie_id
+                JOIN book_seat bs ON b.book_id = bs.book_id
+                JOIN seats s ON bs.seat_id = s.seat_id
+                ORDER BY p.payment_time DESC
+            """)
+            result = cursor.fetchall()
+        return jsonify(result)
+    finally:
+        conn.close()
+
+
+# ================= ADMIN: REFUND BOOKING =================
+@booking_bp.route("/api/admin/booking/refund", methods=["POST"])
+def refund_booking():
+    data = request.json
+    book_id = data.get("book_id")
+    if not book_id:
+        return jsonify({"error": "book_id required"}), 400
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 1. Get payment and user details
+            cursor.execute("""
+                SELECT p.amount, p.status, b.user_id
+                FROM payments p
+                JOIN booking b ON p.book_id = b.book_id
+                WHERE p.book_id = %s
+                FOR UPDATE
+            """, (book_id,))
+            payment = cursor.fetchone()
+            
+            if not payment:
+                return jsonify({"error": "Payment not found"}), 404
+            
+            if payment["status"] != "Paid":
+                # If it's pending, just cancel it normally
+                cursor.execute("DELETE FROM book_seat WHERE book_id = %s", (book_id,))
+                cursor.execute("DELETE FROM payments WHERE book_id = %s", (book_id,))
+                cursor.execute("DELETE FROM booking WHERE book_id = %s", (book_id,))
+                conn.commit()
+                return jsonify({"message": "Pending booking cancelled (no refund needed)"})
+
+            # 2. Refund balance
+            amount = float(payment["amount"])
+            user_id = payment["user_id"]
+            
+            cursor.execute(
+                "UPDATE users SET balance = balance + %s WHERE user_id = %s",
+                (amount, user_id)
+            )
+
+            # 3. Remove booking records to free seat
+            cursor.execute("DELETE FROM book_seat WHERE book_id = %s", (book_id,))
+            cursor.execute("DELETE FROM payments WHERE book_id = %s", (book_id,))
+            cursor.execute("DELETE FROM booking WHERE book_id = %s", (book_id,))
+
+        conn.commit()
+        return jsonify({"message": f"Booking refunded {amount} ฿ and cancelled successfully"})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 400
     finally:
         conn.close()

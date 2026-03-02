@@ -11,7 +11,7 @@ def get_showtimes():
         conn = get_connection()
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT showtime_id, showtime
+                SELECT showtime_id, theater_id, showtime
                 FROM showtimes
                 WHERE movie_id = %s
             """, (movie_id,))
@@ -40,9 +40,22 @@ def create_showtime():
         conn.commit()
         return jsonify({"message": "Showtime created", "showtime_id": new_id}), 201
     except Exception as e:
-        conn.rollback()
-        return jsonify({"error": str(e)}), 400
+        if 'conn' in locals(): conn.rollback()
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
-        conn.close()
+        if 'conn' in locals(): conn.close()
 
 
+@showtimes_bp.route("/api/showtimes/<int:showtime_id>", methods=["DELETE"])
+def delete_showtime(showtime_id):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM showtimes WHERE showtime_id = %s", (showtime_id,))
+        conn.commit()
+        return jsonify({"message": "Showtime deleted"})
+    except Exception as e:
+        if 'conn' in locals(): conn.rollback()
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+    finally:
+        if 'conn' in locals(): conn.close()

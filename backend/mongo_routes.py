@@ -44,7 +44,7 @@ def api_get_movies():
         })
     return jsonify(formatted_movies), 200
 
-@mongo_bp.route('/api/mongo/movies', methods=['POST'])
+@mongo_bp.route('/api/movies', methods=['POST'])
 def api_create_movie():
     """Create a new movie"""
     data = request.get_json() or {}
@@ -68,6 +68,24 @@ def api_create_movie():
     result = mongo_db.movies.insert_one(movie_doc)
     created = mongo_db.movies.find_one({"_id": result.inserted_id})
     return jsonify(serialize_document(created)), 201
+
+@mongo_bp.route('/api/movies/<movie_id>', methods=['DELETE'])
+def api_delete_movie(movie_id):
+    """Delete a movie by its ID"""
+    try:
+        obj_id = ObjectId(movie_id)
+    except Exception:
+        return jsonify({"error": "invalid movie_id"}), 400
+
+    mongo_db = get_mongo_db()
+    result = mongo_db.movies.delete_one({"_id": obj_id})
+    if result.deleted_count == 0:
+        return jsonify({"error": "movie not found"}), 404
+        
+    # Also delete associated reviews (optional but recommended for cleanup)
+    mongo_db.reviews.delete_many({"movie_id": obj_id})
+    
+    return jsonify({"message": "Movie deleted from MongoDB"}), 200
 
 # ==============================
 # THEATERS
