@@ -83,11 +83,25 @@ export default function Transactions({ user, refreshUser }) {
         </div>
       ))}
       {totalDue > 0 && (
-        <div style={{marginTop: 20, fontWeight: "bold"}}>
-          Balance: {Number(user?.balance ?? 0).toFixed(2)} ฿ &nbsp;|&nbsp; Total due: {totalDue} ฿
-          <div style={{marginTop: 12}}>
-            <button onClick={doPayAll}>Pay all ({totalDue} ฿)</button>
+        <div style={{marginTop: 24, padding: 16, borderRadius: 12, background: "#111", border: "1px solid #333"}}>
+          <div style={{fontWeight: "bold", marginBottom: 8}}>
+            Balance: {Number(user?.balance ?? 0).toFixed(2)} ฿ &nbsp;|&nbsp; Total due: {totalDue} ฿
           </div>
+          <button
+            onClick={doPayAll}
+            style={{
+              padding: "10px 18px",
+              borderRadius: 999,
+              border: "none",
+              background: "#22c55e",
+              color: "#000",
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: "0 0 20px rgba(34,197,94,0.35)"
+            }}
+          >
+            Pay all ({totalDue} ฿)
+          </button>
         </div>
       )}
     </div>

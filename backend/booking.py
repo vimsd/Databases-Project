@@ -3,9 +3,13 @@ from db import get_connection
 
 booking_bp = Blueprint("booking", __name__)
 
-# ================= CREATE BOOKING =================
+# ================= CREATE BOOKING (SINGLE SEAT) =================
 @booking_bp.route("/api/booking", methods=["POST"])
 def create_booking():
+    """
+    Legacy endpoint for creating a booking for a single seat.
+    New UI will mostly use /api/booking/bulk for multi-seat flows.
+    """
     data = request.json
     if not data or not all(k in data for k in ("user_id", "showtime_id", "seat_id")):
         return jsonify({"error": "missing required fields"}), 400
@@ -30,7 +34,8 @@ def create_booking():
                 FOR UPDATE
             """, (data["showtime_id"], data["seat_id"]))
             existing = cursor.fetchone()
-            if existing and existing["status"] != "free":
+            # any existing row means seat is already held or booked
+            if existing:
                 return jsonify({"error": "seat already taken"}), 409
 
             # create booking
@@ -63,6 +68,89 @@ def create_booking():
             "message": "Booking pending",
             "book_id": book_id,
             "amount": seat_price
+        }), 201
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 400
+    finally:
+        conn.close()
+
+
+# ================= CREATE MULTIPLE BOOKINGS (MULTI-SEAT) =================
+@booking_bp.route("/api/booking/bulk", methods=["POST"])
+def create_booking_bulk():
+    """
+    Create bookings for multiple seats in a single showtime for a user.
+    Each seat becomes its own booking + payment, so that payments
+    still map 1:1 with seats while allowing a single confirmation flow.
+    """
+    data = request.json or {}
+    user_id = data.get("user_id")
+    showtime_id = data.get("showtime_id")
+    seat_ids = data.get("seat_ids") or []
+
+    if not user_id or not showtime_id or not isinstance(seat_ids, list) or not seat_ids:
+        return jsonify({"error": "user_id, showtime_id and seat_ids[] are required"}), 400
+
+    conn = get_connection()
+    created = []
+    try:
+        with conn.cursor() as cursor:
+            for seat_id in seat_ids:
+                # get seat price
+                cursor.execute(
+                    "SELECT price FROM seats WHERE seat_id = %s",
+                    (seat_id,)
+                )
+                seat = cursor.fetchone()
+                if not seat:
+                    conn.rollback()
+                    return jsonify({"error": f"seat not found: {seat_id}"}), 404
+                seat_price = float(seat["price"])
+
+                # check seat availability (lock)
+                cursor.execute("""
+                    SELECT status FROM book_seat
+                    WHERE showtime_id = %s AND seat_id = %s
+                    FOR UPDATE
+                """, (showtime_id, seat_id))
+                existing = cursor.fetchone()
+                if existing:
+                    conn.rollback()
+                    return jsonify({"error": f"seat already taken: {seat_id}"}), 409
+
+                # create booking
+                cursor.execute(
+                    "INSERT INTO booking (user_id, showtime_id) VALUES (%s, %s)",
+                    (user_id, showtime_id)
+                )
+                book_id = cursor.lastrowid
+
+                # hold seat
+                cursor.execute(
+                    """
+                    INSERT INTO book_seat (book_id, showtime_id, seat_id, status)
+                    VALUES (%s, %s, %s, 'pending')
+                    """,
+                    (book_id, showtime_id, seat_id)
+                )
+
+                # payment record
+                cursor.execute(
+                    """
+                    INSERT INTO payments (book_id, amount, status)
+                    VALUES (%s, %s, 'Pending')
+                    """,
+                    (book_id, seat_price)
+                )
+
+                created.append({"book_id": book_id, "seat_id": seat_id, "amount": seat_price})
+
+        conn.commit()
+        return jsonify({
+            "message": "Bookings pending",
+            "items": created
         }), 201
 
     except Exception as e:

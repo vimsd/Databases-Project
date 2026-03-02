@@ -35,6 +35,15 @@ function App() {
       .catch(console.error);
   };
 
+  // realtime polling so balance updates when changed by payments/admin
+  useEffect(() => {
+    if (!user) return;
+    const id = setInterval(() => {
+      refreshUser();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [user]);
+
   const handleRegister = () => {
     setPage("login");
   };
@@ -44,37 +53,6 @@ function App() {
     setPage("login");
     navigate("/");
   };
-
-  // Route: /transactions — หน้า transaction (ต้อง login ก่อน หรือแสดง login/register)
-  const transactionsEl = (
-    <div style={styles.container}>
-      {user ? (
-        <>
-          <button onClick={() => navigate("/")} style={styles.back}>
-            ⬅ Back
-          </button>
-          <Transactions user={user} refreshUser={refreshUser} />
-        </>
-      ) : page === "register" ? (
-        <>
-          <h1 style={styles.title}>🎬 Cinema System</h1>
-          <Register
-            onRegister={handleRegister}
-            switchToLogin={() => setPage("login")}
-          />
-        </>
-      ) : (
-        <>
-          <h1 style={styles.title}>🎬 Cinema System</h1>
-          <p style={{ marginBottom: 16 }}>Log in to view your transactions.</p>
-          <Login
-            onLogin={handleLogin}
-            switchToRegister={() => setPage("register")}
-          />
-        </>
-      )}
-    </div>
-  );
 
   return (
     <div className="flex flex-col min-h-screen bg-background-dark text-slate-100 font-display transition-colors">
@@ -157,6 +135,9 @@ function Header({ user, onLogout, searchTerm, setSearchTerm, onGoHome }) {
             <div className="text-right hidden sm:block">
               <div className="text-sm font-bold truncate max-w-[120px]">{user.email.split('@')[0]}</div>
               <div className="text-[10px] text-primary uppercase font-bold tracking-tighter">{user.role}</div>
+              <div className="text-[11px] text-emerald-400 font-semibold mt-1">
+                Balance: {Number(user.balance || 0).toFixed(2)} ฿
+              </div>
             </div>
             <button onClick={onLogout} className="text-xs bg-neutral-dark hover:bg-neutral-dark/80 px-3 py-2 rounded-lg transition-colors">Logout</button>
           </div>
@@ -220,7 +201,7 @@ function Cinema({ user, navigate, searchTerm }) {
   const [showtimes, setShowtimes] = useState([]);
   const [showtimeId, setShowtimeId] = useState(null);
   const [seats, setSeats] = useState([]);
-  const [selectedSeat, setSelectedSeat] = useState(null);
+  const [selectedSeats, setSelectedSeats] = useState([]);
 
   useEffect(() => {
     fetch(`${API}/movies`)
@@ -243,22 +224,34 @@ function Cinema({ user, navigate, searchTerm }) {
       .then(setSeats);
   }, [showtimeId]);
 
-  const bookSeat = async (seat_id) => {
-    if (!showtimeId || !seat_id) return;
+  const toggleSeat = (seat) => {
+    const isBooked = seat.status === 'booked' || seat.status === 'pending';
+    if (isBooked) return;
+    setSelectedSeats(prev => {
+      const exists = prev.find(s => s.seat_id === seat.seat_id);
+      if (exists) {
+        return prev.filter(s => s.seat_id !== seat.seat_id);
+      }
+      return [...prev, seat];
+    });
+  };
+
+  const confirmSelection = async () => {
+    if (!showtimeId || selectedSeats.length === 0) return;
     try {
-      const resp = await fetch(`${API}/booking`, {
+      const resp = await fetch(`${API}/booking/bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: user.user_id,
           showtime_id: showtimeId,
-          seat_id
+          seat_ids: selectedSeats.map(s => s.seat_id)
         })
       });
       const res = await resp.json();
       if (!resp.ok) throw new Error(res.error || "booking failed");
 
-      alert("Selection held! Please proceed to payments.");
+      alert("Seats held! Please proceed to payment.");
       navigate("/transactions");
     } catch (e) {
       alert(e.message);
@@ -368,7 +361,7 @@ function Cinema({ user, navigate, searchTerm }) {
                         <span className="w-4 text-[10px] text-neutral-muted font-bold">{rowChar}</span>
                         <div className="flex gap-2">
                           {rowSeats.map(s => {
-                            const isSelected = selectedSeat?.seat_id === s.seat_id;
+                            const isSelected = selectedSeats.some(sel => sel.seat_id === s.seat_id);
                             const isBooked = s.status === 'booked' || s.status === 'pending';
 
                             let stateStyles = "bg-neutral-muted/20 hover:bg-neutral-muted/40 text-transparent";
@@ -379,7 +372,7 @@ function Cinema({ user, navigate, searchTerm }) {
                               <button
                                 key={s.seat_id}
                                 disabled={isBooked}
-                                onClick={() => setSelectedSeat(s)}
+                                onClick={() => toggleSeat(s)}
                                 className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-all text-[10px] font-bold ${stateStyles}`}
                               >
                                 {isBooked ? '×' : (isSelected ? s.seat : <span className="opacity-0 hover:opacity-100">{s.seat}</span>)}
@@ -426,8 +419,12 @@ function Cinema({ user, navigate, searchTerm }) {
                     <div className="flex items-center gap-3 text-neutral-muted">
                       <span className="material-symbols-outlined text-primary text-xl">chair</span>
                       <div>
-                        <div className="text-[10px] uppercase font-bold">Selected Seat</div>
-                        <div className="text-white text-xs">{selectedSeat ? `Seat ${selectedSeat.seat} (Theater ${selectedShowtime?.theater_id})` : '--'}</div>
+                        <div className="text-[10px] uppercase font-bold">Selected Seats</div>
+                        <div className="text-white text-xs">
+                          {selectedSeats.length
+                            ? selectedSeats.map(s => s.seat).join(", ")
+                            : '--'}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -436,16 +433,21 @@ function Cinema({ user, navigate, searchTerm }) {
                 <div className="pt-2">
                   <div className="flex justify-between items-center mb-6 px-4 py-3 bg-primary/5 rounded-xl border border-primary/20">
                     <span className="text-neutral-muted font-bold text-xs uppercase tracking-widest">Total Price</span>
-                    <span className="text-2xl font-black text-primary">{selectedSeat ? `${Number(selectedSeat.price || 250).toFixed(2)} ฿` : '0.00 ฿'}</span>
+                    <span className="text-2xl font-black text-primary">
+                      {selectedSeats.length
+                        ? `${selectedSeats.reduce((sum, s) => sum + Number(s.price || 250), 0).toFixed(2)} ฿`
+                        : '0.00 ฿'}
+                    </span>
                   </div>
 
                   <button
-                    disabled={!selectedSeat}
-                    onClick={() => bookSeat(selectedSeat.seat_id)}
-                    className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${selectedSeat
-                      ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20'
-                      : 'bg-neutral-dark text-neutral-muted cursor-not-allowed border border-neutral-dark/50'
-                      }`}
+                    disabled={selectedSeats.length === 0}
+                    onClick={confirmSelection}
+                    className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
+                      selectedSeats.length
+                        ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20'
+                        : 'bg-neutral-dark text-neutral-muted cursor-not-allowed border border-neutral-dark/50'
+                    }`}
                   >
                     <span>Confirm Booking</span>
                     <span className="material-symbols-outlined">arrow_forward</span>
@@ -459,10 +461,6 @@ function Cinema({ user, navigate, searchTerm }) {
     </div>
   );
 }
-
-/* ================= ADMIN DASHBOARD ================= */
-
-/* ================= ADMIN DASHBOARD ================= */
 
 function AdminDashboard({ user }) {
   const [tab, setTab] = useState("movies");
@@ -509,6 +507,19 @@ function AdminDashboard({ user }) {
     if (tab === "movies") fetchMovies();
     if (tab === "users") fetchUsers();
     if (tab === "bookings") fetchBookings();
+  }, [tab]);
+
+  // keep admin views fresh so balance/booking updates appear in near realtime
+  useEffect(() => {
+    let id;
+    if (tab === "users") {
+      id = setInterval(fetchUsers, 5000);
+    } else if (tab === "bookings") {
+      id = setInterval(fetchBookings, 5000);
+    }
+    return () => {
+      if (id) clearInterval(id);
+    };
   }, [tab]);
 
   const addMovie = async () => {
