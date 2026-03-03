@@ -4,6 +4,86 @@ from db import get_connection
 booking_bp = Blueprint("booking", __name__)
 
 # ================= CREATE BOOKING (SINGLE SEAT) =================
+@booking_bp.route("/api/booking/check-watched", methods=["GET"])
+def check_watched():
+    user_id = request.args.get("user_id")
+    movie_id = request.args.get("movie_id")
+    if not user_id or not movie_id:
+        return jsonify({"can_review": False, "error": "Missing parameters"}), 400
+
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            # Check if user has a PAID booking for ANY showtime of this movie
+            cursor.execute("""
+                SELECT p.payment_id
+                FROM payments p
+                JOIN booking b ON p.book_id = b.book_id
+                JOIN showtimes s ON b.showtime_id = s.showtime_id
+                WHERE b.user_id = %s 
+                  AND s.movie_id = %s 
+                  AND p.status = 'Paid'
+                LIMIT 1
+            """, (user_id, movie_id))
+            row = cursor.fetchone()
+            return jsonify({"can_review": row is not None})
+    except Exception as e:
+        return jsonify({"can_review": False, "error": str(e)}), 500
+    finally:
+        if 'conn' in locals(): conn.close()
+
+@booking_bp.route("/api/booking/history/<int:user_id>", methods=["GET"])
+def get_watch_history(user_id):
+    """Get all paid bookings for a user"""
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            # We need to get: showtime date, movie_id (to join with mongo later if needed, or just display id),
+            # theater_id, number of seats, and total paid
+            cursor.execute("""
+                SELECT 
+                    s.showtime,
+                    s.movie_id,
+                    t.theater_id,
+                    COUNT(bs.seat_id) as seats_booked,
+                    p.amount as amount_paid
+                FROM booking b
+                JOIN payments p ON b.book_id = p.book_id
+                JOIN showtimes s ON b.showtime_id = s.showtime_id
+                JOIN book_seat bs ON b.book_id = bs.book_id
+                JOIN seats t ON bs.seat_id = t.seat_id
+                WHERE b.user_id = %s AND p.status = 'Paid'
+                GROUP BY b.book_id, s.showtime, s.movie_id, t.theater_id, p.amount
+                ORDER BY s.showtime DESC
+            """, (user_id,))
+            history = cursor.fetchall()
+
+            # Now, we should ideally fetch movie titles and theater branch names from Mongo
+            # to make the history complete.
+            from db import get_mongo_db
+            from bson.objectid import ObjectId
+            
+            mongo_db = get_mongo_db()
+            
+            for item in history:
+                try:
+                    movie = mongo_db.movies.find_one({"_id": ObjectId(item["movie_id"])})
+                    item["title"] = movie.get("title", "Unknown Movie") if movie else "Unknown Movie"
+                except:
+                    item["title"] = "Unknown Movie"
+                
+                try:
+                    theater = mongo_db.theaters.find_one({"_id": ObjectId(item["theater_id"])})
+                    item["branch_name"] = theater.get("branch_name", f"Theater {item['theater_id']}") if theater else f"Theater {item['theater_id']}"
+                except:
+                    item["branch_name"] = f"Theater {item['theater_id']}"
+
+            return jsonify(history)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'conn' in locals(): conn.close()
+
 @booking_bp.route("/api/booking", methods=["POST"])
 def create_booking():
     """

@@ -1,9 +1,9 @@
 import datetime
 from flask import Blueprint, request, jsonify
 from bson.objectid import ObjectId
-from db import get_mongo_db
+from db import get_mongo_db, get_connection
 
-mongo_bp = Blueprint("mongo_routes", __name__)
+mongo_bp = Blueprint('mongo', __name__)
 
 def serialize_object_id(value):
     if isinstance(value, ObjectId):
@@ -30,19 +30,32 @@ def serialize_list(cursor):
 
 @mongo_bp.route('/api/movies', methods=['GET'])
 def api_get_movies():
-    """Get all movies from MongoDB"""
+    """Get all movies from MongoDB with average ratings"""
     mongo_db = get_mongo_db()
-    movies = mongo_db.movies.find()
+    movies = list(mongo_db.movies.find())
     
-    # Format the data exactly how the frontend expects it 
-    # (The frontend expects movie_id and title)
-    formatted_movies = []
-    for m in movies:
-        formatted_movies.append({
-            "movie_id": str(m["_id"]),
-            "title": m.get("title", "Untitled")
-        })
-    return jsonify(formatted_movies), 200
+    # Calculate average ratings from reviews collection
+    for movie in movies:
+        movie_id_str = str(movie["_id"])
+        # Aggregate reviews for this movie
+        pipeline = [
+            {"$match": {"movie_id": movie["_id"]}},
+            {"$group": {
+                "_id": "$movie_id",
+                "avg_rating": {"$avg": "$rating"},
+                "count": {"$sum": 1}
+            }}
+        ]
+        stats = list(mongo_db.reviews.aggregate(pipeline))
+        if stats:
+            movie["stats"] = {
+                "average_rating": round(stats[0]["avg_rating"], 1),
+                "total_reviews": stats[0]["count"]
+            }
+        else:
+            movie["stats"] = {"average_rating": 0.0, "total_reviews": 0}
+            
+    return jsonify(serialize_list(movies)), 200
 
 @mongo_bp.route('/api/movies', methods=['POST'])
 def api_create_movie():
@@ -190,6 +203,58 @@ def api_create_review(movie_id):
         "created_at": datetime.datetime.utcnow()
     }
     result = mongo_db.reviews.insert_one(review_doc)
+    
+    # Update movie stats for performance (redundant but helpful for quick listing)
+    pipeline = [
+        {"$match": {"movie_id": movie_obj_id}},
+        {"$group": {
+            "_id": "$movie_id",
+            "avg_rating": {"$avg": "$rating"},
+            "count": {"$sum": 1}
+        }}
+    ]
+    stats = list(mongo_db.reviews.aggregate(pipeline))
+    if stats:
+        mongo_db.movies.update_one(
+            {"_id": movie_obj_id},
+            {"$set": {
+                "stats.average_rating": round(stats[0]["avg_rating"], 1),
+                "stats.total_reviews": stats[0]["count"]
+            }}
+        )
+
     created = mongo_db.reviews.find_one({"_id": result.inserted_id})
     return jsonify(serialize_document(created)), 201
 
+# ================= USER PROFILES =================
+@mongo_bp.route('/api/mongo/profiles/<int:user_id>', methods=['GET'])
+def api_get_profile(user_id):
+    """Get a user profile from MongoDB by their MySQL user_id"""
+    mongo_db = get_mongo_db()
+    profile = mongo_db.user_profiles.find_one({"mysql_user_id": user_id})
+    if not profile:
+        return jsonify({"mysql_user_id": user_id}), 200
+    
+    return jsonify(serialize_document(profile)), 200
+
+@mongo_bp.route('/api/mongo/profiles/<int:user_id>', methods=['PUT'])
+def api_update_profile(user_id):
+    """Update or create a user profile in MongoDB"""
+    data = request.json or {}
+    mongo_db = get_mongo_db()
+    
+    update_data = {
+        "display_name": data.get("display_name", ""),
+        "bio": data.get("bio", ""),
+        "avatar_url": data.get("avatar_url", ""),
+        "updated_at": datetime.datetime.utcnow()
+    }
+    
+    # Upsert: Update if exists, Insert if doesn't exist
+    mongo_db.user_profiles.update_one(
+        {"mysql_user_id": user_id},
+        {"$set": update_data},
+        upsert=True
+    )
+    
+    return jsonify({"message": "Profile updated successfully"}), 200

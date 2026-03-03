@@ -92,8 +92,30 @@ def seed_database():
     oppenheimer_id = str(result.inserted_ids[1])
     print(f"Movies inserted! Dune ID: {dune_id}, Oppenheimer ID: {oppenheimer_id}")
 
-    # 2. Insert Showtimes into MySQL using the string IDs
-    print("Inserting showtimes into MySQL...")
+    # 2. Insert Theaters into MongoDB
+    print("Inserting theaters into MongoDB...")
+    mongo_db.theaters.delete_many({}) # ensure fresh
+    theaters_data = [
+        {
+            "branch_name": "CineBook Paragon",
+            "location": {"city": "Bangkok", "address": "Siam Paragon"},
+            "screens": [{"screen_id": 1, "type": "IMAX"}, {"screen_id": 2, "type": "Standard"}],
+            "updated_at": datetime.datetime.utcnow()
+        },
+        {
+            "branch_name": "CineBook Central",
+            "location": {"city": "Bangkok", "address": "Central World"},
+            "screens": [{"screen_id": 1, "type": "Standard"}],
+            "updated_at": datetime.datetime.utcnow()
+        }
+    ]
+    theater_result = mongo_db.theaters.insert_many(theaters_data)
+    theater_1_id = str(theater_result.inserted_ids[0])
+    theater_2_id = str(theater_result.inserted_ids[1])
+    print(f"Theaters inserted! Paragon ID: {theater_1_id}, Central ID: {theater_2_id}")
+
+    # 3. Insert Showtimes and Seats into MySQL using the string IDs
+    print("Inserting showtimes and seats into MySQL...")
     with mysql_conn.cursor() as cursor:
         # Avoid duplicating if already seeded
         cursor.execute("SELECT COUNT(*) as count FROM showtimes WHERE movie_id = %s", (dune_id,))
@@ -110,9 +132,29 @@ def seed_database():
             cursor.execute("""
                 INSERT INTO showtimes (movie_id, theater_id, showtime)
                 VALUES
-                (%s, 1, '2026-03-02 19:00:00')
+                (%s, 2, '2026-03-02 19:00:00')
             """, (oppenheimer_id,))
             
+        # 4. Insert Default Seats for Theaters
+        print("Inserting seats for theaters...")
+        # Check if seats exist for theater 1
+        cursor.execute("SELECT COUNT(*) as count FROM seats WHERE theater_id = %s", (theater_1_id,))
+        if cursor.fetchone()['count'] == 0:
+            seats_data = []
+            for row in ['A', 'B', 'C', 'D', 'E']:
+                for num in range(1, 11):
+                    seats_data.append((theater_1_id, f"{row}{num}", 250.00))
+            cursor.executemany("INSERT INTO seats (theater_id, seat, price) VALUES (%s, %s, %s)", seats_data)
+
+        # Check if seats exist for theater 2
+        cursor.execute("SELECT COUNT(*) as count FROM seats WHERE theater_id = %s", (theater_2_id,))
+        if cursor.fetchone()['count'] == 0:
+            seats_data = []
+            for row in ['A', 'B', 'C']:
+                for num in range(1, 11):
+                    seats_data.append((theater_2_id, f"{row}{num}", 200.00))
+            cursor.executemany("INSERT INTO seats (theater_id, seat, price) VALUES (%s, %s, %s)", seats_data)
+
         mysql_conn.commit()
     mysql_conn.close()
 

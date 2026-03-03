@@ -4,6 +4,7 @@ import Login from "./Login";
 import Register from "./Register";
 import Transactions from "./Transactions";
 import Admin from "./Admin";
+import Profile from "./Profile";
 
 const API = import.meta.env.VITE_API || "/api";
 
@@ -32,7 +33,13 @@ function App() {
     if (!user) return;
     fetch(`${API}/users/${user.user_id}`)
       .then(r => r.json())
-      .then(data => setUser({ ...data, balance: Number(data.balance || 0) }))
+      .then(data => {
+        const newBalance = Number(data.balance || 0);
+        // Only update if balance changed to prevent unnecessary re-renders during input
+        if (newBalance !== user.balance) {
+          setUser(prev => ({ ...prev, ...data, balance: newBalance }));
+        }
+      })
       .catch(console.error);
   };
 
@@ -72,6 +79,7 @@ function App() {
       <main className="flex-1 layout-container w-full p-4 md:p-10">
         <Routes>
           <Route path="/transactions" element={<TransactionsPage user={user} page={page} setPage={setPage} handleLogin={handleLogin} handleRegister={handleRegister} refreshUser={refreshUser} />} />
+          <Route path="/profile" element={<Profile user={user} />} />
           <Route path="/*" element={
             <>
               {(!user && page === "login") && (
@@ -88,7 +96,7 @@ function App() {
               )}
               {user && (
                 user.role === 'admin' ?
-                  <AdminDashboard user={user} /> :
+                  <Admin /> :
                   <Cinema user={user} navigate={navigate} searchTerm={searchTerm} />
               )}
             </>
@@ -133,14 +141,21 @@ function Header({ user, onLogout, searchTerm, setSearchTerm, onGoHome }) {
         </label>
         {user ? (
           <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <div className="text-sm font-bold truncate max-w-[120px]">{user.email.split('@')[0]}</div>
-              <div className="text-[10px] text-primary uppercase font-bold tracking-tighter">{user.role}</div>
-              <div className="text-[11px] text-emerald-400 font-semibold mt-1">
-                Balance: {Number(user.balance || 0).toFixed(2)} ฿
+            {user.role === 'admin' && (
+              <button onClick={() => navigate("/admin")} className="text-primary hover:text-white transition-colors text-sm font-bold flex items-center gap-1">
+                <span className="material-symbols-outlined text-base">admin_panel_settings</span> Admin Panel
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/profile")}
+              className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2"
+            >
+              <div className="size-8 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/30">
+                <span className="material-symbols-outlined text-sm">person</span>
               </div>
-            </div>
-            <button onClick={onLogout} className="text-xs bg-neutral-dark hover:bg-neutral-dark/80 px-3 py-2 rounded-lg transition-colors">Logout</button>
+              {user.email} (฿{Number(user.balance || 0).toFixed(2)})
+            </button>
+            <button onClick={onLogout} className="text-neutral-muted hover:text-white transition-colors material-symbols-outlined" title="Logout">logout</button>
           </div>
         ) : (
           <button onClick={() => window.location.reload()} className="bg-primary text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/20">Sign In</button>
@@ -203,12 +218,11 @@ function Cinema({ user, navigate, searchTerm }) {
   const [showtimeId, setShowtimeId] = useState(null);
   const [seats, setSeats] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const [theaters, setTheaters] = useState([]);
 
   useEffect(() => {
-    fetch(`${API}/movies`)
-      .then(r => r.json())
-      .then(setMovies)
-      .catch(console.error);
+    fetch(`${API}/movies`).then(r => r.json()).then(setMovies).catch(console.error);
+    fetch(`${API}/mongo/theaters`).then(r => r.json()).then(setTheaters).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -291,11 +305,22 @@ function Cinema({ user, navigate, searchTerm }) {
           {filteredMovies.map(m => (
             <div key={m.movie_id} onClick={() => setMovieId(m.movie_id)} className="group cursor-pointer">
               <div className="aspect-[2/3] bg-neutral-dark/40 rounded-2xl overflow-hidden mb-3 relative border border-neutral-dark/50 group-hover:border-primary/50 transition-all duration-300 shadow-lg">
-                {/* Placeholder for movie image until real ones used */}
-                <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-10 group-hover:opacity-30 transition-opacity">🎬</div>
-                <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="text-xs text-primary font-bold uppercase tracking-tighter mb-1">Now Showing</div>
-                  <div className="text-sm font-bold truncate">{m.title}</div>
+                {m.media?.poster_url ? (
+                  <img src={m.media.poster_url} alt={m.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-10 group-hover:opacity-30 transition-opacity">🎬</div>
+                )}
+                <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+                  <div className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">{m.content_rating || 'NR'}</div>
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm font-bold truncate max-w-[70%]">{m.title}</div>
+                    {m.stats?.total_reviews > 0 && (
+                      <div className="flex items-center gap-1 text-xs font-black text-yellow-400">
+                        <span className="material-symbols-outlined text-xs">star</span>
+                        {m.stats.average_rating}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -305,36 +330,69 @@ function Cinema({ user, navigate, searchTerm }) {
 
       {/* STEP 2: SELECT SHOWTIME */}
       {movieId && !showtimeId && (
-        <div className="flex flex-col gap-8">
-          <div className="flex items-center gap-6">
-            <div className="size-24 md:size-32 bg-neutral-dark/40 rounded-2xl flex items-center justify-center text-5xl border border-neutral-dark/50">🎬</div>
-            <div>
-              <h1 className="text-3xl md:text-5xl font-bold mb-2">{selectedMovie?.title}</h1>
-              <div className="flex gap-4 text-sm text-neutral-muted">
-                <span>IMAX 2D</span>
-                <span>UA | 2h 49min</span>
+        <div className="flex flex-col gap-10">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
+            <div className="w-48 md:w-64 aspect-[2/3] bg-neutral-dark/40 rounded-2xl overflow-hidden shadow-2xl shrink-0 border border-neutral-dark/50 flex items-center justify-center text-5xl">
+              {selectedMovie?.media?.poster_url ? (
+                <img src={selectedMovie.media.poster_url} alt={selectedMovie.title} className="w-full h-full object-cover" />
+              ) : "🎬"}
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-4xl md:text-5xl font-bold mb-2">{selectedMovie?.title}</h1>
+              {selectedMovie?.stats?.total_reviews > 0 && (
+                <div className="flex items-center gap-2 mb-4 text-yellow-400">
+                  <div className="flex items-center">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <span key={star} className={`material-symbols-outlined text-sm ${star <= Math.round(selectedMovie.stats.average_rating) ? 'fill-1' : 'opacity-30'}`}>star</span>
+                    ))}
+                  </div>
+                  <span className="font-bold text-sm">{selectedMovie.stats.average_rating}</span>
+                  <span className="text-neutral-muted text-xs">({selectedMovie.stats.total_reviews} reviews)</span>
+                </div>
+              )}
+              <div className="flex flex-wrap justify-center md:justify-start gap-3 text-xs font-bold uppercase tracking-wider mb-6">
+                <span className="bg-primary/20 text-primary px-3 py-1 rounded-full border border-primary/20">{selectedMovie?.content_rating || 'NR'}</span>
+                {selectedMovie?.duration_minutes && <span className="bg-neutral-dark/50 px-3 py-1 rounded-full border border-neutral-dark">{selectedMovie.duration_minutes} MIN</span>}
+                {selectedMovie?.genres?.slice(0, 3).map(g => (
+                  <span key={g} className="bg-neutral-dark/50 px-3 py-1 rounded-full border border-neutral-dark">{g}</span>
+                ))}
               </div>
+              <p className="text-neutral-muted text-sm md:text-base leading-relaxed max-w-2xl mb-6">
+                {selectedMovie?.synopsis || "No synopsis available."}
+              </p>
+              {selectedMovie?.cast?.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] text-primary uppercase font-bold tracking-widest mb-2">Cast</h4>
+                  <p className="text-sm text-neutral-muted">{selectedMovie.cast.map(c => c.name).join(", ")}</p>
+                </div>
+              )}
             </div>
           </div>
 
-          <div>
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">calendar_month</span> Available Showtimes
+          <div className="mt-8 border-t border-neutral-dark/50 pt-10">
+            <h3 className="text-2xl font-bold mb-6 flex items-center gap-3">
+              <span className="material-symbols-outlined text-primary text-3xl">calendar_month</span> Available Showtimes
             </h3>
             <div className="flex flex-wrap gap-4">
-              {showtimes.map(s => (
-                <button
-                  key={s.showtime_id}
-                  onClick={() => setShowtimeId(s.showtime_id)}
-                  className="bg-neutral-dark/30 hover:bg-primary transition-all p-4 rounded-xl border border-neutral-dark group"
-                >
-                  <div className="text-sm font-bold group-hover:text-white">{new Date(s.showtime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                  <div className="text-[10px] text-neutral-muted group-hover:text-white/80 mt-1 uppercase">Theater {s.theater_id}</div>
-                </button>
-              ))}
+              {showtimes.map(s => {
+                const tName = theaters.find(t => String(t._id) === String(s.theater_id))?.branch_name || `Theater ${s.theater_id}`;
+                return (
+                  <button
+                    key={s.showtime_id}
+                    onClick={() => setShowtimeId(s.showtime_id)}
+                    className="bg-neutral-dark/30 hover:bg-primary transition-all p-5 rounded-2xl border border-neutral-dark hover:border-primary/50 group text-left shadow-lg hover:shadow-primary/20 hover:-translate-y-1"
+                  >
+                    <div className="text-2xl font-black mb-1 group-hover:text-white">{new Date(s.showtime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div className="text-xs text-neutral-muted group-hover:text-white/90 font-medium">{tName}</div>
+                    <div className="text-[10px] text-primary group-hover:text-white/70 mt-3 uppercase tracking-widest font-bold">{new Date(s.showtime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                  </button>
+                );
+              })}
               {showtimes.length === 0 && <p className="text-neutral-muted italic">No showtimes scheduled for this movie.</p>}
             </div>
           </div>
+
+          <Reviews movieId={movieId} user={user} />
         </div>
       )}
 
@@ -462,291 +520,7 @@ function Cinema({ user, navigate, searchTerm }) {
   );
 }
 
-function AdminDashboard({ user }) {
-  const [tab, setTab] = useState("movies");
-  const [movies, setMovies] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [bookings, setBookings] = useState([]);
-  const [newMovie, setNewMovie] = useState("");
 
-  const fetchMovies = () => fetch(`${API}/movies`).then(r => r.json()).then(setMovies);
-  const fetchUsers = () => fetch(`${API}/admin/users`).then(r => r.json()).then(setUsers);
-  const fetchBookings = () => fetch(`${API}/admin/bookings`).then(r => r.json()).then(setBookings);
-
-  const [selectedMovie, setSelectedMovie] = useState(null);
-  const [showtimes, setShowtimes] = useState([]);
-  const [newShowtime, setNewShowtime] = useState({ theater_id: 1, showtime: "" });
-
-  const fetchShowtimes = (movieId) => {
-    fetch(`${API}/showtimes?movie_id=${movieId}`)
-      .then(r => r.json())
-      .then(setShowtimes);
-  };
-
-  useEffect(() => {
-    if (selectedMovie) fetchShowtimes(selectedMovie.movie_id);
-  }, [selectedMovie]);
-
-  const addShowtime = async () => {
-    if (!newShowtime.showtime) return;
-    await fetch(`${API}/showtimes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newShowtime, movie_id: selectedMovie.movie_id })
-    });
-    setNewShowtime({ ...newShowtime, showtime: "" });
-    fetchShowtimes(selectedMovie.movie_id);
-  };
-
-  const deleteShowtime = async (id) => {
-    await fetch(`${API}/showtimes/${id}`, { method: "DELETE" });
-    fetchShowtimes(selectedMovie.movie_id);
-  };
-
-  useEffect(() => {
-    if (tab === "movies") fetchMovies();
-    if (tab === "users") fetchUsers();
-    if (tab === "bookings") fetchBookings();
-  }, [tab]);
-
-  // keep admin views fresh so balance/booking updates appear in near realtime
-  useEffect(() => {
-    let id;
-    if (tab === "users") {
-      id = setInterval(fetchUsers, 5000);
-    } else if (tab === "bookings") {
-      id = setInterval(fetchBookings, 5000);
-    }
-    return () => {
-      if (id) clearInterval(id);
-    };
-  }, [tab]);
-
-  const addMovie = async () => {
-    if (!newMovie) return;
-    await fetch(`${API}/movies`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newMovie })
-    });
-    setNewMovie("");
-    fetchMovies();
-  };
-
-  const deleteMovie = async (id) => {
-    await fetch(`${API}/movies/${id}`, { method: "DELETE" });
-    fetchMovies();
-  };
-
-  const updateBalance = async (userId, newBalance) => {
-    await fetch(`${API}/admin/users/${userId}/balance`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ balance: Number(newBalance) })
-    });
-    fetchUsers();
-  };
-
-  const refundBooking = async (bookId) => {
-    const res = await fetch(`${API}/admin/booking/refund`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_id: bookId })
-    });
-    const data = await res.json();
-    if (res.ok) alert(data.message);
-    else alert(data.error);
-    fetchBookings();
-  };
-
-  return (
-    <div style={{ marginTop: 20 }}>
-      <h1 style={{ textAlign: "center", color: "#00ffcc" }}>🛠 Admin Control Panel</h1>
-
-      {/* TABS */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 30 }}>
-        {["movies", "users", "bookings"].map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              padding: "10px 20px",
-              background: tab === t ? "#00ffcc" : "#333",
-              color: tab === t ? "#000" : "#fff",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-              fontWeight: "bold",
-              textTransform: "capitalize"
-            }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ background: "#222", padding: 30, borderRadius: 15, border: "1px solid #333" }}>
-
-        {/* MOVIES TAB */}
-        {tab === "movies" && (
-          <div>
-            <h2>Manage Movies</h2>
-            <div style={{ marginBottom: 20 }}>
-              <input
-                placeholder="New Movie Title"
-                value={newMovie}
-                onChange={e => setNewMovie(e.target.value)}
-                style={{ ...styles.input, marginRight: 10, width: "300px" }}
-              />
-              <button style={styles.button} onClick={addMovie}>Add Movie</button>
-            </div>
-            <div style={styles.grid}>
-              {movies.map(m => (
-                <div key={m.movie_id} style={{ ...styles.card, minWidth: "300px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <span style={{ fontWeight: "bold" }}>{m.title}</span>
-                    <div>
-                      <button
-                        style={{ background: "#444", color: "#00ffcc", border: "none", padding: "5px 10px", cursor: "pointer", marginRight: 5 }}
-                        onClick={() => setSelectedMovie(m)}
-                      >
-                        🕒 Showtimes
-                      </button>
-                      <button style={{ background: "salmon", border: "none", padding: "5px 10px", cursor: "pointer" }} onClick={() => deleteMovie(m.movie_id)}>Delete</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* SHOWTIME MODAL-ISH OVERLAY */}
-            {selectedMovie && (
-              <div style={{
-                position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-                background: "rgba(0,0,0,0.8)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000
-              }}>
-                <div style={{ background: "#222", padding: 30, borderRadius: 15, width: "500px", border: "1px solid #444" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                    <h2>Showtimes: {selectedMovie.title}</h2>
-                    <button onClick={() => setSelectedMovie(null)} style={{ background: "none", border: "none", color: "white", fontSize: 24, cursor: "pointer" }}>×</button>
-                  </div>
-
-                  <div style={{ marginBottom: 20, borderBottom: "1px solid #444", paddingBottom: 20 }}>
-                    <h3>Add New Showtime</h3>
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <input
-                        type="number" placeholder="Theater ID"
-                        value={newShowtime.theater_id}
-                        onChange={e => setNewShowtime({ ...newShowtime, theater_id: e.target.value })}
-                        style={{ ...styles.input, width: 80 }}
-                      />
-                      <input
-                        type="datetime-local"
-                        value={newShowtime.showtime}
-                        onChange={e => setNewShowtime({ ...newShowtime, showtime: e.target.value })}
-                        style={{ ...styles.input, flex: 1 }}
-                      />
-                      <button style={styles.button} onClick={addShowtime}>Add</button>
-                    </div>
-                  </div>
-
-                  <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-                    {showtimes.map(st => (
-                      <div key={st.showtime_id} style={{
-                        display: "flex", justifyContent: "space-between", alignItems: "center",
-                        padding: 10, background: "#333", marginBottom: 5, borderRadius: 5
-                      }}>
-                        <span>Theater {st.theater_id} - {new Date(st.showtime).toLocaleString()}</span>
-                        <button style={{ background: "salmon", border: "none", padding: "3px 8px", cursor: "pointer" }} onClick={() => deleteShowtime(st.showtime_id)}>Delete</button>
-                      </div>
-                    ))}
-                    {showtimes.length === 0 && <p style={{ opacity: 0.5 }}>No showtimes scheduled.</p>}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* USERS TAB */}
-        {tab === "users" && (
-          <div>
-            <h2>User Management</h2>
-            <table style={{ width: "100%", textAlign: "left", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid #444" }}>
-                  <th style={{ padding: 10 }}>Email</th>
-                  <th style={{ padding: 10 }}>Role</th>
-                  <th style={{ padding: 10 }}>Balance (฿)</th>
-                  <th style={{ padding: 10 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(u => (
-                  <tr key={u.user_id} style={{ borderBottom: "1px solid #333" }}>
-                    <td style={{ padding: 10 }}>{u.email}</td>
-                    <td style={{ padding: 10 }}>{u.role}</td>
-                    <td style={{ padding: 10 }}>{Number(u.balance).toFixed(2)}</td>
-                    <td style={{ padding: 10 }}>
-                      <button
-                        style={{ ...styles.button, fontSize: "12px", background: "#444", color: "#fff" }}
-                        onClick={() => {
-                          const val = prompt("Enter new balance:", u.balance);
-                          if (val !== null) updateBalance(u.user_id, val);
-                        }}
-                      >
-                        Edit Balance
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* BOOKINGS TAB */}
-        {tab === "bookings" && (
-          <div>
-            <h2>Global Bookings & Refunds</h2>
-            <div style={styles.grid}>
-              {bookings.map(b => (
-                <div key={b.payment_id} style={{ ...styles.card, minWidth: "350px", border: b.status === 'Paid' ? '1px solid #00ffcc' : '1px solid #444' }}>
-                  <div style={{ fontWeight: "bold", fontSize: "18px" }}>{b.movie}</div>
-                  <div style={{ opacity: 0.7 }}>User: {b.user_email}</div>
-                  <div style={{ marginTop: 5 }}>Seat: {b.seat} | Price: {Number(b.amount).toFixed(2)} ฿</div>
-                  <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                      fontSize: "12px",
-                      background: b.status === 'Paid' ? '#006644' : '#666',
-                      color: "#fff"
-                    }}>{b.status}</span>
-
-                    <button
-                      style={{
-                        background: "orange",
-                        border: "none",
-                        padding: "5px 10px",
-                        cursor: "pointer",
-                        borderRadius: 4,
-                        fontWeight: "bold"
-                      }}
-                      onClick={() => refundBooking(b.book_id)}
-                    >
-                      Cancel & Refund
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ================= STYLES ================= */
 
@@ -804,5 +578,168 @@ const styles = {
     padding: "6px 10px"
   }
 };
+
+function Reviews({ movieId, user }) {
+  const [reviews, setReviews] = useState([]);
+  const [canReview, setCanReview] = useState(false);
+  const [loadingObj, setLoadingObj] = useState(true);
+
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchReviews();
+    checkCanReview();
+  }, [movieId, user]);
+
+  const fetchReviews = () => {
+    fetch(`${API}/mongo/movies/${movieId}/reviews`)
+      .then(r => r.json())
+      .then(data => setReviews(Array.isArray(data) ? data : []))
+      .catch(console.error);
+  };
+
+  const checkCanReview = async () => {
+    if (!user) {
+      setLoadingObj(false);
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/booking/check-watched?user_id=${user.user_id}&movie_id=${movieId}`);
+      const data = await res.json();
+      setCanReview(data.can_review);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingObj(false);
+    }
+  };
+
+  const submitReview = async (e) => {
+    e.preventDefault();
+    if (!comment.trim()) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API}/mongo/movies/${movieId}/reviews`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mysql_user_id: user.user_id,
+          rating,
+          comment
+        })
+      });
+      if (res.ok) {
+        setComment("");
+        setRating(5);
+        fetchReviews();
+        alert("Review submitted!");
+      } else {
+        const err = await res.json();
+        alert(err.error || "Failed to submit review");
+      }
+    } catch (e) {
+      alert("Network error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="mt-12 border-t border-neutral-dark/50 pt-10">
+      <h3 className="text-2xl font-bold mb-8 flex items-center gap-3">
+        <span className="material-symbols-outlined text-primary text-3xl">star</span> Audience Reviews
+      </h3>
+
+      <div className="flex flex-col lg:flex-row gap-10 items-start">
+        {/* Review Form */}
+        <div className="w-full lg:w-1/3 bg-neutral-dark/20 p-6 rounded-2xl border border-neutral-dark">
+          <h4 className="text-lg font-bold mb-4">Write a Review</h4>
+
+          {!user ? (
+            <div className="text-sm text-neutral-muted bg-neutral-dark/40 p-4 rounded-xl text-center">
+              Please sign in to write a review.
+            </div>
+          ) : loadingObj ? (
+            <div className="text-sm text-neutral-muted text-center p-4">Checking eligibility...</div>
+          ) : !canReview ? (
+            <div className="text-sm text-neutral-muted bg-neutral-dark/40 p-4 rounded-xl text-center border border-dashed border-neutral-muted/30">
+              <span className="material-symbols-outlined text-3xl opacity-50 mb-2 block">lock</span>
+              You must purchase a ticket & watch this movie before reviewing to prevent spoilers!
+            </div>
+          ) : (
+            <form onSubmit={submitReview} className="flex flex-col gap-4">
+              <div>
+                <label className="text-xs uppercase font-bold text-neutral-muted mb-2 block">Your Rating</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      type="button"
+                      key={star}
+                      onClick={() => setRating(star)}
+                      className={`material-symbols-outlined text-2xl transition-colors ${rating >= star ? 'text-yellow-400' : 'text-neutral-dark'}`}
+                    >
+                      star
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs uppercase font-bold text-neutral-muted mb-2 block">Your Thoughts</label>
+                <textarea
+                  required
+                  rows="4"
+                  value={comment}
+                  onChange={e => setComment(e.target.value)}
+                  className="w-full bg-neutral-dark/50 border border-neutral-dark rounded-xl p-3 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-none"
+                  placeholder="What did you think of the movie?"
+                ></textarea>
+              </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="bg-primary hover:bg-primary/90 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+              >
+                {submitting ? 'Posting...' : 'Post Review'}
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* Review List */}
+        <div className="flex-1 w-full flex flex-col gap-4">
+          {reviews.length === 0 ? (
+            <div className="text-center p-10 bg-neutral-dark/10 rounded-2xl border border-neutral-dark/30">
+              <span className="material-symbols-outlined text-4xl text-neutral-muted opacity-50 mb-2 block">forum</span>
+              <p className="text-neutral-muted">No reviews yet. Be the first to share your thoughts!</p>
+            </div>
+          ) : (
+            reviews.map(r => (
+              <div key={r._id} className="bg-neutral-dark/30 p-5 rounded-2xl border border-neutral-dark/50 flex gap-4 items-start">
+                <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
+                  U{r.mysql_user_id}
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-start mb-1">
+                    <div className="font-bold text-sm">User {r.mysql_user_id}</div>
+                    <div className="flex text-yellow-400 text-sm">
+                      {[...Array(r.rating)].map((_, i) => <span key={i} className="material-symbols-outlined text-[14px]">star</span>)}
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-neutral-muted uppercase tracking-wider mb-3">
+                    {new Date(r.created_at).toLocaleDateString()}
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed break-words">{r.comment}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default App;
