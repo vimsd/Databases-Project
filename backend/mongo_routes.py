@@ -35,12 +35,17 @@ def api_get_movies():
     movies = mongo_db.movies.find()
     
     # Format the data exactly how the frontend expects it 
-    # (The frontend expects movie_id and title)
     formatted_movies = []
     for m in movies:
         formatted_movies.append({
             "movie_id": str(m["_id"]),
-            "title": m.get("title", "Untitled")
+            "title": m.get("title", "Untitled"),
+            "synopsis": m.get("synopsis", ""),
+            "media": m.get("media", {}),
+            "duration_minutes": m.get("duration_minutes", 0),
+            "genres": m.get("genres", []),
+            "content_rating": m.get("content_rating", "G"),
+            "status": m.get("status", "now_showing")
         })
     return jsonify(formatted_movies), 200
 

@@ -291,9 +291,17 @@ function Cinema({ user, navigate, searchTerm }) {
           {filteredMovies.map(m => (
             <div key={m.movie_id} onClick={() => setMovieId(m.movie_id)} className="group cursor-pointer">
               <div className="aspect-[2/3] bg-neutral-dark/40 rounded-2xl overflow-hidden mb-3 relative border border-neutral-dark/50 group-hover:border-primary/50 transition-all duration-300 shadow-lg">
-                {/* Placeholder for movie image until real ones used */}
-                <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-10 group-hover:opacity-30 transition-opacity">🎬</div>
-                <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/80 to-transparent">
+                {m.media?.poster_url ? (
+                  <img
+                    src={m.media.poster_url}
+                    alt={m.title}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => { e.target.src = 'https://via.placeholder.com/400x600?text=No+Image'; }}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-10 group-hover:opacity-30 transition-opacity">🎬</div>
+                )}
+                <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
                   <div className="text-xs text-primary font-bold uppercase tracking-tighter mb-1">Now Showing</div>
                   <div className="text-sm font-bold truncate">{m.title}</div>
                 </div>
@@ -306,14 +314,30 @@ function Cinema({ user, navigate, searchTerm }) {
       {/* STEP 2: SELECT SHOWTIME */}
       {movieId && !showtimeId && (
         <div className="flex flex-col gap-8">
-          <div className="flex items-center gap-6">
-            <div className="size-24 md:size-32 bg-neutral-dark/40 rounded-2xl flex items-center justify-center text-5xl border border-neutral-dark/50">🎬</div>
-            <div>
-              <h1 className="text-3xl md:text-5xl font-bold mb-2">{selectedMovie?.title}</h1>
-              <div className="flex gap-4 text-sm text-neutral-muted">
-                <span>IMAX 2D</span>
-                <span>UA | 2h 49min</span>
+          <div className="flex items-start gap-6">
+            <div className="w-32 md:w-48 aspect-[2/3] bg-neutral-dark/40 rounded-2xl overflow-hidden flex items-center justify-center border border-neutral-dark/50 shadow-2xl">
+              {selectedMovie?.media?.poster_url ? (
+                <img src={selectedMovie.media.poster_url} alt={selectedMovie.title} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-5xl">🎬</span>
+              )}
+            </div>
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-5xl font-bold mb-3">{selectedMovie?.title}</h1>
+              <div className="flex flex-wrap gap-3 mb-4">
+                <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-bold rounded border border-primary/20">{selectedMovie?.content_rating || 'PG-13'}</span>
+                <span className="text-sm text-neutral-muted flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">schedule</span>
+                  {selectedMovie?.duration_minutes || 120} min
+                </span>
+                <span className="text-sm text-neutral-muted flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">theater_comedy</span>
+                  {selectedMovie?.genres?.join(", ") || "Action, Adventure"}
+                </span>
               </div>
+              <p className="text-neutral-muted text-sm md:text-base leading-relaxed max-w-2xl line-clamp-3 md:line-clamp-none">
+                {selectedMovie?.synopsis || "No synopsis available for this movie."}
+              </p>
             </div>
           </div>
 
@@ -354,32 +378,41 @@ function Cinema({ user, navigate, searchTerm }) {
                 {/* Rows A-H logic based on current DB setup usually A1-A10 etc */}
                 {/* We'll dynamic map seats into rows of 10 for display */}
                 {
-                  Array.from({ length: Math.ceil(seats.length / 10) }).map((_, rowIndex) => {
-                    const rowSeats = seats.slice(rowIndex * 10, (rowIndex + 1) * 10);
+                  Array.from({ length: Math.ceil(seats.length / 14) }).map((_, rowIndex) => {
+                    const rowSeats = seats.slice(rowIndex * 14, (rowIndex + 1) * 14);
                     const rowChar = String.fromCharCode(65 + rowIndex);
+
+                    // Split 14 seats into 2-9-3 chunks
+                    const chunk1 = rowSeats.slice(0, 2);
+                    const chunk2 = rowSeats.slice(2, 11);
+                    const chunk3 = rowSeats.slice(11, 14);
+
+                    const renderChunk = (chunk) => chunk.map(s => {
+                      const isSelected = selectedSeats.some(sel => sel.seat_id === s.seat_id);
+                      const isBooked = s.status === 'booked' || s.status === 'pending';
+                      let stateStyles = "bg-neutral-muted/20 hover:bg-neutral-muted/40 text-transparent";
+                      if (isBooked) stateStyles = "bg-neutral-dark text-neutral-muted/30 cursor-not-allowed";
+                      if (isSelected) stateStyles = "bg-primary text-white shadow-[0_0_12px_rgba(234,42,51,0.6)]";
+
+                      return (
+                        <button
+                          key={s.seat_id}
+                          disabled={isBooked}
+                          onClick={() => toggleSeat(s)}
+                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-all text-[10px] font-bold ${stateStyles}`}
+                        >
+                          {isBooked ? '×' : (isSelected ? s.seat : <span className="opacity-0 hover:opacity-100">{s.seat}</span>)}
+                        </button>
+                      );
+                    });
+
                     return (
-                      <div key={rowIndex} className="flex items-center gap-4 seat-row">
-                        <span className="w-4 text-[10px] text-neutral-muted font-bold">{rowChar}</span>
-                        <div className="flex gap-2">
-                          {rowSeats.map(s => {
-                            const isSelected = selectedSeats.some(sel => sel.seat_id === s.seat_id);
-                            const isBooked = s.status === 'booked' || s.status === 'pending';
-
-                            let stateStyles = "bg-neutral-muted/20 hover:bg-neutral-muted/40 text-transparent";
-                            if (isBooked) stateStyles = "bg-neutral-dark text-neutral-muted/30 cursor-not-allowed";
-                            if (isSelected) stateStyles = "bg-primary text-white shadow-[0_0_12px_rgba(234,42,51,0.6)]";
-
-                            return (
-                              <button
-                                key={s.seat_id}
-                                disabled={isBooked}
-                                onClick={() => toggleSeat(s)}
-                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-all text-[10px] font-bold ${stateStyles}`}
-                              >
-                                {isBooked ? '×' : (isSelected ? s.seat : <span className="opacity-0 hover:opacity-100">{s.seat}</span>)}
-                              </button>
-                            )
-                          })}
+                      <div key={rowIndex} className="flex items-center gap-4 seat-row group/row">
+                        <span className="w-4 text-[10px] text-neutral-muted font-bold group-hover/row:text-primary transition-colors">{rowChar}</span>
+                        <div className="flex gap-4">
+                          <div className="flex gap-2">{renderChunk(chunk1)}</div>
+                          <div className="flex gap-2 mx-4">{renderChunk(chunk2)}</div>
+                          <div className="flex gap-2">{renderChunk(chunk3)}</div>
                         </div>
                       </div>
                     )
@@ -402,7 +435,13 @@ function Cinema({ user, navigate, searchTerm }) {
               <div className="p-6 flex flex-col gap-6">
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="size-16 bg-neutral-dark/50 rounded-xl flex items-center justify-center text-2xl border border-neutral-dark">🎬</div>
+                    <div className="size-16 bg-neutral-dark/50 rounded-xl overflow-hidden flex items-center justify-center border border-neutral-dark">
+                      {selectedMovie?.media?.poster_url ? (
+                        <img src={selectedMovie.media.poster_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-2xl">🎬</span>
+                      )}
+                    </div>
                     <div>
                       <div className="text-[10px] text-primary uppercase font-bold tracking-widest mb-1">Selected Movie</div>
                       <h3 className="font-bold text-white text-lg leading-tight">{selectedMovie?.title}</h3>

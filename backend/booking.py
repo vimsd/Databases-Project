@@ -326,9 +326,9 @@ def transactions(user_id):
                 SELECT p.payment_id,
                        p.book_id,
                        p.amount,
-                       p.payment_time,
+                       DATE_FORMAT(p.payment_time, '%%Y-%%m-%%d %%H:%%i:%%s') AS payment_time,
                        p.status,
-                       st.showtime,
+                       DATE_FORMAT(st.showtime, '%%Y-%%m-%%d %%H:%%i:%%s') AS showtime,
                        st.movie_id,
                        s.seat
                 FROM payments p
@@ -376,21 +376,41 @@ def list_bookings():
                 SELECT p.payment_id,
                        p.book_id,
                        p.amount,
-                       p.payment_time,
+                       DATE_FORMAT(p.payment_time, '%%Y-%%m-%%d %%H:%%i:%%s') AS payment_time,
                        p.status,
                        u.email as user_email,
-                       m.title AS movie,
+                       st.movie_id,
                        s.seat
                 FROM payments p
                 JOIN booking b ON p.book_id = b.book_id
                 JOIN users u ON b.user_id = u.user_id
                 JOIN showtimes st ON b.showtime_id = st.showtime_id
-                JOIN movies m ON st.movie_id = m.movie_id
                 JOIN book_seat bs ON b.book_id = bs.book_id
                 JOIN seats s ON bs.seat_id = s.seat_id
                 ORDER BY p.payment_time DESC
             """)
             result = cursor.fetchall()
+
+        # Fetch movie titles from MongoDB
+        if result:
+            from db import get_mongo_db
+            from bson.objectid import ObjectId
+            mongo_db = get_mongo_db()
+            movie_ids = list(set([str(r["movie_id"]) for r in result if r.get("movie_id")]))
+            
+            movie_map = {}
+            for m_id in movie_ids:
+                try:
+                    obj_id = ObjectId(m_id)
+                    movie = mongo_db.movies.find_one({"_id": obj_id})
+                    if movie:
+                        movie_map[m_id] = movie.get("title", "Unknown Movie")
+                except Exception:
+                    movie_map[m_id] = "Unknown Movie"
+
+            for row in result:
+                row["movie"] = movie_map.get(str(row["movie_id"]), "Unknown Movie")
+
         return jsonify(result)
     finally:
         conn.close()

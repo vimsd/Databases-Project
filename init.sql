@@ -66,8 +66,9 @@ CREATE TABLE payments (
 
 INSERT INTO users (email, password, balance, role)
 VALUES 
-('admin@gmail.com', 'scrypt:32768:8:1$lFv0CK660arMNLIG$c6a8cabb11962e36ef89eeb7c3001a1cfbbd9f5a5f7d52a528c83a2f4887e4eab84fbdc5606405154fb57c7b1a1754e5ad7248a41ab93df50cf57a8f16471d13', 0.00, 'admin');
-
+('admin@gmail.com', 'scrypt:32768:8:1$slxychCQmO0Npf8Q$2f47153f81fd277829fd63756c95191078b5ec5b0d9e23c9129339005af4c182d1a40faf85344d5b02468ded056df0d8f5b4a895950f71208b2b1508dd05affd', 0.00, 'admin'),
+-- password 123 ทั้งคู่
+('user1@gmail.com', 'scrypt:32768:8:1$b4ehg5pah1bis1g7$c8871d7a43695e2964e6ccbf2bca24149fa16172e72d0e031c7f83eec34edd615596ae17818903bd37b8a9a2a16b7378557fb907fd3049c36aba0e9baa9eb5d9', 1000.00, 'user');
 
 -- Note: movies and showtimes are now inserted via backend/seed.py 
 -- for mapping MongoDB string IDs.

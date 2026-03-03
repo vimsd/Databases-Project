@@ -11,7 +11,7 @@ export default function Admin() {
     const [theaters, setTheaters] = useState([]);
 
     // Form states
-    const [movieForm, setMovieForm] = useState({ title: "", duration_minutes: "", genres: "" });
+    const [movieForm, setMovieForm] = useState({ title: "", duration_minutes: "", genres: "", poster_url: "", synopsis: "" });
     const [theaterForm, setTheaterForm] = useState({ branch_name: "" });
     const [showtimeForm, setShowtimeForm] = useState({ movie_id: "", theater_id: "", showtime: "" });
 
@@ -34,12 +34,14 @@ export default function Admin() {
                 body: JSON.stringify({
                     title: movieForm.title,
                     duration_minutes: Number(movieForm.duration_minutes),
-                    genres: movieForm.genres.split(",").map(g => g.trim())
+                    genres: movieForm.genres.split(",").map(g => g.trim()),
+                    media: { poster_url: movieForm.poster_url },
+                    synopsis: movieForm.synopsis
                 })
             });
             if (resp.ok) {
                 alert("Movie added successfully!");
-                setMovieForm({ title: "", duration_minutes: "", genres: "" });
+                setMovieForm({ title: "", duration_minutes: "", genres: "", poster_url: "", synopsis: "" });
                 fetchMoviesAndTheaters(); // Refresh list for showtimes dropdown
             } else {
                 const err = await resp.json();
@@ -112,6 +114,8 @@ export default function Admin() {
                         <input style={styles.input} required placeholder="Movie Title" value={movieForm.title} onChange={e => setMovieForm({ ...movieForm, title: e.target.value })} />
                         <input style={styles.input} type="number" required placeholder="Duration (mins)" value={movieForm.duration_minutes} onChange={e => setMovieForm({ ...movieForm, duration_minutes: e.target.value })} />
                         <input style={styles.input} placeholder="Genres (comma separated)" value={movieForm.genres} onChange={e => setMovieForm({ ...movieForm, genres: e.target.value })} />
+                        <input style={styles.input} placeholder="Poster URL" value={movieForm.poster_url} onChange={e => setMovieForm({ ...movieForm, poster_url: e.target.value })} />
+                        <textarea style={styles.textarea} placeholder="Synopsis" value={movieForm.synopsis} onChange={e => setMovieForm({ ...movieForm, synopsis: e.target.value })} />
                         <button style={styles.button} type="submit">Add Movie</button>
                     </form>
                 </div>
@@ -180,6 +184,18 @@ const styles = {
         backgroundColor: "#333",
         color: "white",
         boxSizing: "border-box"
+    },
+    textarea: {
+        padding: 10,
+        marginBottom: 15,
+        width: "100%",
+        borderRadius: 5,
+        border: "1px solid #444",
+        backgroundColor: "#333",
+        color: "white",
+        boxSizing: "border-box",
+        minHeight: "100px",
+        fontFamily: "inherit"
     },
     button: {
         padding: "10px",
