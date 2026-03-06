@@ -215,6 +215,7 @@ function Cinema({ user, navigate, searchTerm }) {
   const [movies, setMovies] = useState([]);
   const [movieId, setMovieId] = useState(null);
   const [showtimes, setShowtimes] = useState([]);
+  const [selectedFormat, setSelectedFormat] = useState(null);
   const [showtimeId, setShowtimeId] = useState(null);
   const [seats, setSeats] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState([]);
@@ -229,7 +230,10 @@ function Cinema({ user, navigate, searchTerm }) {
     if (!movieId) return;
     fetch(`${API}/showtimes?movie_id=${movieId}`)
       .then(r => r.json())
-      .then(setShowtimes);
+      .then(data => {
+        setShowtimes(data);
+        setSelectedFormat(null); // Reset format when new movie is loaded
+      });
   }, [movieId]);
 
   useEffect(() => {
@@ -284,15 +288,23 @@ function Cinema({ user, navigate, searchTerm }) {
     <div className="flex flex-col gap-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-neutral-muted text-xs md:text-sm mb-4">
-        <span className="hover:text-primary transition-colors cursor-pointer" onClick={() => { setMovieId(null); setShowtimeId(null); }}>Movies</span>
+        <span className="hover:text-primary transition-colors cursor-pointer" onClick={() => { setMovieId(null); setSelectedFormat(null); setShowtimeId(null); }}>Movies</span>
         {movieId && (
           <>
             <span className="material-symbols-outlined text-[10px]">chevron_right</span>
-            <span className="hover:text-primary transition-colors cursor-pointer" onClick={() => setShowtimeId(null)}>{selectedMovie?.title}</span>
+            <span className="hover:text-primary transition-colors cursor-pointer" onClick={() => { setSelectedFormat(null); setShowtimeId(null); }}>{selectedMovie?.title}</span>
+          </>
+        )}
+        {selectedFormat && !showtimeId && (
+          <>
+            <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+            <span className="text-white font-medium">{selectedFormat}</span>
           </>
         )}
         {showtimeId && (
           <>
+            <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+            <span className="text-neutral-muted cursor-pointer hover:text-white transition-colors" onClick={() => setShowtimeId(null)}>{selectedFormat || 'Seat Selection'}</span>
             <span className="material-symbols-outlined text-[10px]">chevron_right</span>
             <span className="text-white font-medium">Seats</span>
           </>
@@ -381,25 +393,54 @@ function Cinema({ user, navigate, searchTerm }) {
 
           <div className="mt-8 border-t border-neutral-dark/50 pt-10">
             <h3 className="text-2xl font-bold mb-6 flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-3xl">calendar_month</span> Available Showtimes
+              <span className="material-symbols-outlined text-primary text-3xl">smart_display</span> Select Format
             </h3>
-            <div className="flex flex-wrap gap-4">
-              {showtimes.map(s => {
-                const tName = theaters.find(t => String(t._id) === String(s.theater_id))?.branch_name || `Theater ${s.theater_id}`;
-                return (
+
+            {!selectedFormat ? (
+              <div className="flex flex-wrap gap-4">
+                {Array.from(new Set(showtimes.map(s => theaters.find(t => String(t._id) === String(s.theater_id))?.format || 'Standard'))).map(format => (
                   <button
-                    key={s.showtime_id}
-                    onClick={() => setShowtimeId(s.showtime_id)}
-                    className="bg-neutral-dark/30 hover:bg-primary transition-all p-5 rounded-2xl border border-neutral-dark hover:border-primary/50 group text-left shadow-lg hover:shadow-primary/20 hover:-translate-y-1"
+                    key={format}
+                    onClick={() => setSelectedFormat(format)}
+                    className="bg-neutral-dark/30 hover:bg-primary transition-all p-6 rounded-2xl border border-neutral-dark hover:border-primary/50 group text-center shadow-lg hover:shadow-primary/20 hover:-translate-y-1 min-w-[160px]"
                   >
-                    <div className="text-2xl font-black mb-1 group-hover:text-white">{new Date(s.showtime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                    <div className="text-xs text-neutral-muted group-hover:text-white/90 font-medium">{tName}</div>
-                    <div className="text-[10px] text-primary group-hover:text-white/70 mt-3 uppercase tracking-widest font-bold">{new Date(s.showtime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                    <div className="text-2xl font-black group-hover:text-white uppercase tracking-widest">{format}</div>
+                    <div className="text-[10px] text-neutral-muted group-hover:text-white/70 mt-2 uppercase tracking-wide">
+                      Select for Showtimes
+                    </div>
                   </button>
-                );
-              })}
-              {showtimes.length === 0 && <p className="text-neutral-muted italic">No showtimes scheduled for this movie.</p>}
-            </div>
+                ))}
+                {showtimes.length === 0 && <p className="text-neutral-muted italic px-2">No showtimes scheduled for this movie.</p>}
+              </div>
+            ) : (
+              <div className="animate-fade-in transition-all">
+                <button onClick={() => setSelectedFormat(null)} className="flex items-center gap-2 text-xs text-primary mb-6 hover:text-white transition-colors uppercase font-bold tracking-wider">
+                  <span className="material-symbols-outlined text-sm">arrow_back</span>
+                  Change Format
+                </button>
+                <div className="flex flex-wrap gap-4">
+                  {showtimes.filter(s => {
+                    const format = theaters.find(t => String(t._id) === String(s.theater_id))?.format || 'Standard';
+                    return format === selectedFormat;
+                  }).map(s => {
+                    return (
+                      <button
+                        key={s.showtime_id}
+                        onClick={() => setShowtimeId(s.showtime_id)}
+                        className="bg-neutral-dark/30 hover:bg-primary transition-all p-5 rounded-2xl border border-neutral-dark hover:border-primary/50 group text-center shadow-lg hover:shadow-primary/20 hover:-translate-y-1 relative overflow-hidden flex flex-col items-center min-w-[120px]"
+                      >
+                        <div className="text-2xl font-black mt-1 mb-2 group-hover:text-white">
+                          {new Date(s.showtime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <div className="text-[10px] bg-neutral-dark/50 group-hover:bg-black/20 text-neutral-muted group-hover:text-white px-3 py-1 rounded-full uppercase tracking-widest font-bold">
+                          {new Date(s.showtime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <Reviews movieId={movieId} user={user} />
@@ -497,6 +538,16 @@ function Cinema({ user, navigate, searchTerm }) {
 
                   <div className="flex flex-col gap-3 py-4 border-y border-neutral-dark/50">
                     <div className="flex items-center gap-3 text-neutral-muted">
+                      <span className="material-symbols-outlined text-primary text-xl">smart_display</span>
+                      <div>
+                        <div className="text-[10px] uppercase font-bold">Screen Format</div>
+                        <div className="text-white text-xs">
+                          {theaters.find(t => String(t._id) === String(selectedShowtime?.theater_id))?.branch_name || 'Theater'}
+                          <span className="text-primary ml-1 font-bold">({theaters.find(t => String(t._id) === String(selectedShowtime?.theater_id))?.format || 'Standard'})</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-neutral-muted">
                       <span className="material-symbols-outlined text-primary text-xl">event</span>
                       <div>
                         <div className="text-[10px] uppercase font-bold">Date & Time</div>
@@ -509,7 +560,7 @@ function Cinema({ user, navigate, searchTerm }) {
                         <div className="text-[10px] uppercase font-bold">Selected Seats</div>
                         <div className="text-white text-xs">
                           {selectedSeats.length
-                            ? selectedSeats.map(s => s.seat).join(", ")
+                            ? selectedSeats.map(s => `${s.seat} (฿${Number(s.price || 250)})`).join(", ")
                             : '--'}
                         </div>
                       </div>
