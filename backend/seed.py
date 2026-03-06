@@ -138,8 +138,30 @@ def seed_database():
     oppenheimer_id = movie_ids["Oppenheimer"]
     print(f"Movies synced! Dune ID: {dune_id}, Oppenheimer ID: {oppenheimer_id}")
 
-    # 2. Insert Showtimes into MySQL using the string IDs
-    print("Inserting showtimes into MySQL...")
+    # 2. Insert Theaters into MongoDB
+    print("Inserting theaters into MongoDB...")
+    mongo_db.theaters.delete_many({}) # ensure fresh
+    theaters_data = [
+        {
+            "branch_name": "CineBook Paragon",
+            "location": {"city": "Bangkok", "address": "Siam Paragon"},
+            "screens": [{"screen_id": 1, "type": "IMAX"}, {"screen_id": 2, "type": "Standard"}],
+            "updated_at": datetime.datetime.utcnow()
+        },
+        {
+            "branch_name": "CineBook Central",
+            "location": {"city": "Bangkok", "address": "Central World"},
+            "screens": [{"screen_id": 1, "type": "Standard"}],
+            "updated_at": datetime.datetime.utcnow()
+        }
+    ]
+    theater_result = mongo_db.theaters.insert_many(theaters_data)
+    theater_1_id = str(theater_result.inserted_ids[0])
+    theater_2_id = str(theater_result.inserted_ids[1])
+    print(f"Theaters inserted! Paragon ID: {theater_1_id}, Central ID: {theater_2_id}")
+
+    # 3. Insert Showtimes and Seats into MySQL using the string IDs
+    print("Inserting showtimes and seats into MySQL...")
     with mysql_conn.cursor() as cursor:
         # Define showtimes for all movies
         seeding_data = [
@@ -162,9 +184,7 @@ def seed_database():
                             (m_id, th_id, st_time)
                         )
             
-        mysql_conn.commit()
-
-        # 3. Insert Seats (A-H, 1-14)
+        # 4. Insert Default Seats for Theaters
         print("Seeding theater seats (2-9-3 layout)...")
         # Clear existing seats to avoid duplicates or messy layouts
         cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
@@ -173,13 +193,14 @@ def seed_database():
         cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
         
         rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-        for row in rows:
-            for num in range(1, 15):
-                seat_label = f"{row}{num}"
-                cursor.execute(
-                    "INSERT INTO seats (theater_id, seat, price) VALUES (%s, %s, %s)",
-                    (1, seat_label, 250.00)
-                )
+        for tid in [theater_1_id, theater_2_id]:
+            for row in rows:
+                for num in range(1, 15):
+                    seat_label = f"{row}{num}"
+                    cursor.execute(
+                        "INSERT INTO seats (theater_id, seat, price) VALUES (%s, %s, %s)",
+                        (tid, seat_label, 250.00 if tid == theater_1_id else 200.00)
+                    )
         
         mysql_conn.commit()
 

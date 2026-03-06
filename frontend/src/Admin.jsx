@@ -11,7 +11,11 @@ export default function Admin() {
     const [theaters, setTheaters] = useState([]);
 
     // Form states
-    const [movieForm, setMovieForm] = useState({ title: "", duration_minutes: "", genres: "", poster_url: "", synopsis: "" });
+    const [movieForm, setMovieForm] = useState({
+        title: "", duration_minutes: "", genres: "",
+        synopsis: "", release_date: "", content_rating: "PG-13",
+        poster_url: "", cast: ""
+    });
     const [theaterForm, setTheaterForm] = useState({ branch_name: "" });
     const [showtimeForm, setShowtimeForm] = useState({ movie_id: "", theater_id: "", showtime: "" });
 
@@ -28,20 +32,27 @@ export default function Admin() {
     const handleAddMovie = async (e) => {
         e.preventDefault();
         try {
-            const resp = await fetch(`${API}/mongo/movies`, {
+            const resp = await fetch(`${API}/movies`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     title: movieForm.title,
                     duration_minutes: Number(movieForm.duration_minutes),
                     genres: movieForm.genres.split(",").map(g => g.trim()),
-                    media: { poster_url: movieForm.poster_url },
-                    synopsis: movieForm.synopsis
+                    synopsis: movieForm.synopsis,
+                    release_date: movieForm.release_date ? new Date(movieForm.release_date).toISOString() : null,
+                    content_rating: movieForm.content_rating,
+                    cast: movieForm.cast.split(",").map(c => ({ name: c.trim(), role: "" })),
+                    media: { poster_url: movieForm.poster_url }
                 })
             });
             if (resp.ok) {
                 alert("Movie added successfully!");
-                setMovieForm({ title: "", duration_minutes: "", genres: "", poster_url: "", synopsis: "" });
+                setMovieForm({
+                    title: "", duration_minutes: "", genres: "",
+                    synopsis: "", release_date: "", content_rating: "PG-13",
+                    poster_url: "", cast: ""
+                });
                 fetchMoviesAndTheaters(); // Refresh list for showtimes dropdown
             } else {
                 const err = await resp.json();
@@ -81,17 +92,13 @@ export default function Admin() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     movie_id: showtimeForm.movie_id,
-                    // Convert theater_id from MongoDB String ID to integer if matching MySQL 
-                    // Note: In our current setup, theater_id in init.sql is INT 
-                    // For simplicity in this dummy form, we'll extract an integer or pass a raw ID
-                    // Actual production might need the MySQL theater_id, we will assume theater mapping here.
-                    theater_id: 1, // hardcoded to 1 for this demo to sync with MySQL init.sql structure
+                    theater_id: showtimeForm.theater_id,
                     showtime: showtimeForm.showtime
                 })
             });
             if (resp.ok) {
                 alert("Showtime added successfully!");
-                setShowtimeForm({ movie_id: "", theater_id: "1", showtime: "" });
+                setShowtimeForm({ movie_id: "", theater_id: "", showtime: "" });
             } else {
                 const err = await resp.json();
                 alert("Failed to add showtime: " + err.error);
@@ -112,10 +119,19 @@ export default function Admin() {
                     <h2 style={{ color: "#00ffcc" }}>1. Add Movie (MongoDB)</h2>
                     <form onSubmit={handleAddMovie}>
                         <input style={styles.input} required placeholder="Movie Title" value={movieForm.title} onChange={e => setMovieForm({ ...movieForm, title: e.target.value })} />
+                        <textarea style={styles.input} required placeholder="Synopsis..." rows="3" value={movieForm.synopsis} onChange={e => setMovieForm({ ...movieForm, synopsis: e.target.value })} />
+                        <input style={styles.input} type="date" required value={movieForm.release_date} onChange={e => setMovieForm({ ...movieForm, release_date: e.target.value })} />
                         <input style={styles.input} type="number" required placeholder="Duration (mins)" value={movieForm.duration_minutes} onChange={e => setMovieForm({ ...movieForm, duration_minutes: e.target.value })} />
-                        <input style={styles.input} placeholder="Genres (comma separated)" value={movieForm.genres} onChange={e => setMovieForm({ ...movieForm, genres: e.target.value })} />
-                        <input style={styles.input} placeholder="Poster URL" value={movieForm.poster_url} onChange={e => setMovieForm({ ...movieForm, poster_url: e.target.value })} />
-                        <textarea style={styles.textarea} placeholder="Synopsis" value={movieForm.synopsis} onChange={e => setMovieForm({ ...movieForm, synopsis: e.target.value })} />
+                        <input style={styles.input} placeholder="Genres (Sci-Fi, Action)" value={movieForm.genres} onChange={e => setMovieForm({ ...movieForm, genres: e.target.value })} />
+                        <input style={styles.input} placeholder="Actor Name 1, Actor Name 2" value={movieForm.cast} onChange={e => setMovieForm({ ...movieForm, cast: e.target.value })} />
+                        <input style={styles.input} placeholder="Poster URL (https://...)" value={movieForm.poster_url} onChange={e => setMovieForm({ ...movieForm, poster_url: e.target.value })} />
+                        <select style={styles.input} value={movieForm.content_rating} onChange={e => setMovieForm({ ...movieForm, content_rating: e.target.value })}>
+                            <option value="G">G - General Audiences</option>
+                            <option value="PG">PG - Parental Guidance</option>
+                            <option value="PG-13">PG-13 - Parents Strongly Cautioned</option>
+                            <option value="R">R - Restricted</option>
+                        </select>
+
                         <button style={styles.button} type="submit">Add Movie</button>
                     </form>
                 </div>
@@ -138,7 +154,10 @@ export default function Admin() {
                             {movies.map(m => <option key={m.movie_id} value={m.movie_id}>{m.title}</option>)}
                         </select>
 
-                        <p style={{ fontSize: 12, margin: '0 0 10px 0' }}>Note: Theater defaults to ID 1 for MySQL compatibility.</p>
+                        <select style={styles.input} required value={showtimeForm.theater_id} onChange={e => setShowtimeForm({ ...showtimeForm, theater_id: e.target.value })}>
+                            <option value="">-- Select Theater --</option>
+                            {theaters.map(t => <option key={t._id} value={t._id}>{t.branch_name}</option>)}
+                        </select>
 
                         <input style={styles.input} type="datetime-local" required value={showtimeForm.showtime} onChange={e => setShowtimeForm({ ...showtimeForm, showtime: e.target.value })} />
                         <button style={styles.button} type="submit">Add Showtime</button>
