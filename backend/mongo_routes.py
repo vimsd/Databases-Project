@@ -226,35 +226,4 @@ def api_create_review(movie_id):
     created = mongo_db.reviews.find_one({"_id": result.inserted_id})
     return jsonify(serialize_document(created)), 201
 
-# ================= USER PROFILES =================
-@mongo_bp.route('/api/mongo/profiles/<int:user_id>', methods=['GET'])
-def api_get_profile(user_id):
-    """Get a user profile from MongoDB by their MySQL user_id"""
-    mongo_db = get_mongo_db()
-    profile = mongo_db.user_profiles.find_one({"mysql_user_id": user_id})
-    if not profile:
-        return jsonify({"mysql_user_id": user_id}), 200
-    
-    return jsonify(serialize_document(profile)), 200
 
-@mongo_bp.route('/api/mongo/profiles/<int:user_id>', methods=['PUT'])
-def api_update_profile(user_id):
-    """Update or create a user profile in MongoDB"""
-    data = request.json or {}
-    mongo_db = get_mongo_db()
-    
-    update_data = {
-        "display_name": data.get("display_name", ""),
-        "bio": data.get("bio", ""),
-        "avatar_url": data.get("avatar_url", ""),
-        "updated_at": datetime.datetime.utcnow()
-    }
-    
-    # Upsert: Update if exists, Insert if doesn't exist
-    mongo_db.user_profiles.update_one(
-        {"mysql_user_id": user_id},
-        {"$set": update_data},
-        upsert=True
-    )
-    
-    return jsonify({"message": "Profile updated successfully"}), 200

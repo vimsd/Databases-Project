@@ -11,7 +11,8 @@ def get_showtimes():
         conn = get_connection()
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT showtime_id, theater_id, showtime
+                SELECT showtime_id, theater_id,
+                       DATE_FORMAT(showtime, '%%Y-%%m-%%d %%H:%%i:%%s') AS showtime
                 FROM showtimes
                 WHERE movie_id = %s
             """, (movie_id,))
@@ -32,10 +33,11 @@ def create_showtime():
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
+            st_time = data['showtime'].replace('T', ' ')
             cursor.execute("""
                 INSERT INTO showtimes (movie_id, theater_id, showtime)
                 VALUES (%s, %s, %s)
-            """, (data['movie_id'], data['theater_id'], data['showtime']))
+            """, (data['movie_id'], data['theater_id'], st_time))
             new_id = cursor.lastrowid
         conn.commit()
         return jsonify({"message": "Showtime created", "showtime_id": new_id}), 201

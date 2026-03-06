@@ -131,6 +131,7 @@ export default function Admin() {
                             <option value="PG-13">PG-13 - Parents Strongly Cautioned</option>
                             <option value="R">R - Restricted</option>
                         </select>
+
                         <button style={styles.button} type="submit">Add Movie</button>
                     </form>
                 </div>
@@ -202,6 +203,18 @@ const styles = {
         backgroundColor: "#333",
         color: "white",
         boxSizing: "border-box"
+    },
+    textarea: {
+        padding: 10,
+        marginBottom: 15,
+        width: "100%",
+        borderRadius: 5,
+        border: "1px solid #444",
+        backgroundColor: "#333",
+        color: "white",
+        boxSizing: "border-box",
+        minHeight: "100px",
+        fontFamily: "inherit"
     },
     button: {
         padding: "10px",
