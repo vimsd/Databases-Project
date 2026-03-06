@@ -69,14 +69,12 @@ def api_create_movie():
     movie_doc = {
         "title": data['title'],
         "synopsis": data.get('synopsis'),
-        "release_date": data.get('release_date'),
         "duration_minutes": data.get('duration_minutes'),
         "genres": data.get('genres', []),
-        "content_rating": data.get('content_rating'),
+        "content_rating": data.get('content_rating', 'PG-13'),
         "cast": data.get('cast', []),
         "media": data.get('media', {}),
-        "stats": data.get('stats', {"average_rating": 0.0, "total_reviews": 0}),
-        "status": data.get('status', 'now_showing')
+        "stats": data.get('stats', {"average_rating": 0.0, "total_reviews": 0})
     }
     result = mongo_db.movies.insert_one(movie_doc)
     created = mongo_db.movies.find_one({"_id": result.inserted_id})
@@ -95,10 +93,22 @@ def api_delete_movie(movie_id):
     if result.deleted_count == 0:
         return jsonify({"error": "movie not found"}), 404
         
-    # Also delete associated reviews (optional but recommended for cleanup)
+    # Also delete associated reviews
     mongo_db.reviews.delete_many({"movie_id": obj_id})
     
-    return jsonify({"message": "Movie deleted from MongoDB"}), 200
+    # Cascade delete associated showtimes in MySQL
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM showtimes WHERE movie_id = %s", (movie_id,))
+        conn.commit()
+    except Exception as e:
+        if 'conn' in locals() and conn: conn.rollback()
+        print(f"Failed to cascade delete showtimes for movie {movie_id}: {e}")
+    finally:
+        if 'conn' in locals() and conn: conn.close()
+    
+    return jsonify({"message": "Movie and associated data deleted successfully"}), 200
 
 # ==============================
 # THEATERS
@@ -112,7 +122,7 @@ def api_get_theaters():
 
 @mongo_bp.route('/api/mongo/theaters', methods=['POST'])
 def api_create_theater():
-    """Create a new theater branch"""
+    """Create a new Screen (previously theater branch)"""
     data = request.get_json() or {}
     required = ['branch_name']
     if any(field not in data for field in required):
@@ -121,9 +131,9 @@ def api_create_theater():
     mongo_db = get_mongo_db()
     theater_doc = {
         "branch_name": data['branch_name'],
-        "location": data.get('location', {}),
+        "format": data.get('format', 'Standard'),
+        "location": data.get('location', {"city": "Poipet", "address": "Central Poipet"}),
         "facilities": data.get('facilities', []),
-        "screens": data.get('screens', []),
         "updated_at": data.get('updated_at') or datetime.datetime.utcnow()
     }
     result = mongo_db.theaters.insert_one(theater_doc)

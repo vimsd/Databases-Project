@@ -7,7 +7,7 @@ def get_mysql_connection():
     return pymysql.connect(
         host=os.getenv("DB_HOST", "localhost"),
         user=os.getenv("DB_USER", "root"),
-        password=os.getenv("DB_PASSWORD", "rootpassword"),
+        password=os.getenv("DB_PASSWORD", ""),
         database=os.getenv("DB_NAME", "cinema_db"),
         cursorclass=pymysql.cursors.DictCursor,
         autocommit=False
@@ -57,65 +57,55 @@ def seed_database():
         {
             "title": "Dune",
             "synopsis": "A mythic and emotionally charged hero's journey...",
-            "release_date": datetime.datetime(2021, 10, 22),
             "duration_minutes": 155,
             "genres": ["Action", "Adventure", "Sci-Fi"],
             "content_rating": "PG-13",
-            "cast": [{"name": "Timothee Chalamet", "role": "Paul Atreides"}],
+            "cast": [{"name": "Timothee Chalamet"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/5/52/Dune_Part_Two_poster.jpeg"},
-            "stats": {"average_rating": 4.8, "total_reviews": 1500},
-            "status": "now_showing"
+            "stats": {"average_rating": 4.8, "total_reviews": 1500}
         },
         {
             "title": "Oppenheimer",
             "synopsis": "The story of American scientist J. Robert Oppenheimer...",
-            "release_date": datetime.datetime(2023, 7, 21),
             "duration_minutes": 180,
             "genres": ["Biography", "Drama", "History"],
             "content_rating": "R",
-            "cast": [{"name": "Cillian Murphy", "role": "J. Robert Oppenheimer"}],
+            "cast": [{"name": "Cillian Murphy"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/4/4a/Oppenheimer_%28film%29.jpg"},
-            "stats": {"average_rating": 4.9, "total_reviews": 2000},
-            "status": "now_showing"
+            "stats": {"average_rating": 4.9, "total_reviews": 2000}
         },
 # 1. Barbie
         {
             "title": "Barbie",
             "synopsis": "Barbie suffers a crisis that leads her to question her world and her existence.",
-            "release_date": datetime.datetime(2023, 7, 21),
             "duration_minutes": 114,
             "genres": ["Adventure", "Comedy", "Fantasy"],
             "content_rating": "PG-13",
-            "cast": [{"name": "Margot Robbie", "role": "Barbie"}, {"name": "Ryan Gosling", "role": "Ken"}],
+            "cast": [{"name": "Margot Robbie"}, {"name": "Ryan Gosling"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/0/0b/Barbie_2023_poster.jpg"},
-            "stats": {"average_rating": 4.5, "total_reviews": 1500},
-            "status": "now_showing"
+            "stats": {"average_rating": 4.5, "total_reviews": 1500}
         },
     # 2. The Dark Knight (แทน Dune)
         {
             "title": "The Dark Knight",
             "synopsis": "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice.",
-            "release_date": datetime.datetime(2008, 7, 18),
             "duration_minutes": 152,
             "genres": ["Action", "Crime", "Drama"],
             "content_rating": "PG-13",
-            "cast": [{"name": "Christian Bale", "role": "Bruce Wayne"}, {"name": "Heath Ledger", "role": "Joker"}],
+            "cast": [{"name": "Christian Bale"}, {"name": "Heath Ledger"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/1/1c/The_Dark_Knight_%282008_film%29.jpg"},
-            "stats": {"average_rating": 4.9, "total_reviews": 5000},
-            "status": "now_showing"
+            "stats": {"average_rating": 4.9, "total_reviews": 5000}
         },
     # 3. Spider-Man: Across the Spider-Verse
         {
             "title": "Spider-Man: Across the Spider-Verse",
             "synopsis": "Miles Morales catapults across the Multiverse, where he encounters a team of Spider-People charged with protecting its very existence.",
-            "release_date": datetime.datetime(2023, 6, 2),
             "duration_minutes": 140,
             "genres": ["Animation", "Action", "Adventure"],
             "content_rating": "PG",
-            "cast": [{"name": "Shameik Moore", "role": "Miles Morales"}, {"name": "Hailee Steinfeld", "role": "Gwen Stacy"}],
+            "cast": [{"name": "Shameik Moore"}, {"name": "Hailee Steinfeld"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/b/b4/Spider-Man-_Across_the_Spider-Verse_poster.jpg"},
-            "stats": {"average_rating": 4.9, "total_reviews": 2800},
-            "status": "now_showing"
+            "stats": {"average_rating": 4.9, "total_reviews": 2800}
         }
     ]
 
@@ -139,37 +129,44 @@ def seed_database():
     print(f"Movies synced! Dune ID: {dune_id}, Oppenheimer ID: {oppenheimer_id}")
 
     # 2. Insert Theaters into MongoDB
-    print("Inserting theaters into MongoDB...")
+    print("Inserting Screens into MongoDB...")
     mongo_db.theaters.delete_many({}) # ensure fresh
     theaters_data = [
         {
-            "branch_name": "CineBook Paragon",
-            "location": {"city": "Bangkok", "address": "Siam Paragon"},
-            "screens": [{"screen_id": 1, "type": "IMAX"}, {"screen_id": 2, "type": "Standard"}],
+            "branch_name": "Screen 1",
+            "format": "IMAX",
+            "location": {"city": "Bangkok", "address": "Central Ladprao"},
             "updated_at": datetime.datetime.utcnow()
         },
         {
-            "branch_name": "CineBook Central",
-            "location": {"city": "Bangkok", "address": "Central World"},
-            "screens": [{"screen_id": 1, "type": "Standard"}],
+            "branch_name": "Screen 2",
+            "format": "4DX",
+            "location": {"city": "Bangkok", "address": "Central Ladprao"},
+            "updated_at": datetime.datetime.utcnow()
+        },
+        {
+            "branch_name": "Screen 3",
+            "format": "Standard",
+            "location": {"city": "Bangkok", "address": "Central Ladprao"},
             "updated_at": datetime.datetime.utcnow()
         }
     ]
     theater_result = mongo_db.theaters.insert_many(theaters_data)
     theater_1_id = str(theater_result.inserted_ids[0])
     theater_2_id = str(theater_result.inserted_ids[1])
-    print(f"Theaters inserted! Paragon ID: {theater_1_id}, Central ID: {theater_2_id}")
+    theater_3_id = str(theater_result.inserted_ids[2])
+    print(f"Screens inserted! Screen 1: {theater_1_id}, Screen 2: {theater_2_id}, Screen 3: {theater_3_id}")
 
     # 3. Insert Showtimes and Seats into MySQL using the string IDs
     print("Inserting showtimes and seats into MySQL...")
     with mysql_conn.cursor() as cursor:
         # Define showtimes for all movies
         seeding_data = [
-            ("Dune", [('2026-03-04 18:00:00', 1), ('2026-03-04 20:30:00', 1)]),
-            ("Oppenheimer", [('2026-03-04 19:00:00', 1)]),
-            ("Barbie", [('2026-03-04 14:00:00', 1), ('2026-03-04 16:30:00', 1)]),
-            ("The Dark Knight", [('2026-03-04 21:00:00', 1)]),
-            ("Spider-Man: Across the Spider-Verse", [('2026-03-04 15:00:00', 1)])
+            ("Dune", [('2026-03-04 18:00:00', theater_1_id), ('2026-03-04 20:30:00', theater_2_id)]),
+            ("Oppenheimer", [('2026-03-04 19:00:00', theater_1_id)]),
+            ("Barbie", [('2026-03-04 14:00:00', theater_3_id), ('2026-03-04 16:30:00', theater_3_id)]),
+            ("The Dark Knight", [('2026-03-04 21:00:00', theater_1_id)]),
+            ("Spider-Man: Across the Spider-Verse", [('2026-03-04 15:00:00', theater_2_id)])
         ]
 
         for movie_title, times in seeding_data:
@@ -185,22 +182,36 @@ def seed_database():
                         )
             
         # 4. Insert Default Seats for Theaters
-        print("Seeding theater seats (2-9-3 layout)...")
+        print("Seeding tiered theater seats (A-E layout)...")
         # Clear existing seats to avoid duplicates or messy layouts
         cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
         cursor.execute("TRUNCATE TABLE book_seat")
         cursor.execute("TRUNCATE TABLE seats")
         cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
         
-        rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-        for tid in [theater_1_id, theater_2_id]:
-            for row in rows:
-                for num in range(1, 15):
-                    seat_label = f"{row}{num}"
-                    cursor.execute(
-                        "INSERT INTO seats (theater_id, seat, price) VALUES (%s, %s, %s)",
-                        (tid, seat_label, 250.00 if tid == theater_1_id else 200.00)
-                    )
+        # Define Tiers: row_prefix, num_seats, (imax_price, 4dx_price, standard_price)
+        tiers = [
+            ({'A'}, 6, (800.00, 800.00, 500.00)),       # VIP/Sofa
+            ({'B', 'C'}, 8, (450.00, 450.00, 280.00)),  # Premium
+            ({'D', 'E'}, 10, (350.00, 350.00, 200.00))  # Standard
+        ]
+        
+        screen_specs = [
+            (theater_1_id, 0), # 0 = IMAX index
+            (theater_2_id, 1), # 1 = 4DX index
+            (theater_3_id, 2)  # 2 = Standard index
+        ]
+        
+        for tid, price_idx in screen_specs:
+            for rows, num_seats, prices in tiers:
+                seat_price = prices[price_idx]
+                for row in rows:
+                    for num in range(1, num_seats + 1):
+                        seat_label = f"{row}{num}"
+                        cursor.execute(
+                            "INSERT INTO seats (theater_id, seat, price) VALUES (%s, %s, %s)",
+                            (tid, seat_label, seat_price)
+                        )
         
         mysql_conn.commit()
 

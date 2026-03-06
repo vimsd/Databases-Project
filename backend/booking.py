@@ -410,6 +410,7 @@ def transactions(user_id):
                        p.status,
                        DATE_FORMAT(st.showtime, '%%Y-%%m-%%d %%H:%%i:%%s') AS showtime,
                        st.movie_id,
+                       st.theater_id,
                        s.seat
                 FROM payments p
                 JOIN booking b ON p.book_id = b.book_id
@@ -421,12 +422,13 @@ def transactions(user_id):
             """, (user_id,))
             result = cursor.fetchall()
             
-        # Fetch movie titles from MongoDB
+        # Fetch movie titles and theater info from MongoDB
         if result:
             from db import get_mongo_db
             from bson.objectid import ObjectId
             mongo_db = get_mongo_db()
             movie_ids = list(set([str(r["movie_id"]) for r in result if r.get("movie_id")]))
+            theater_ids = list(set([str(r["theater_id"]) for r in result if r.get("theater_id")]))
             
             # Map valid ObjectIds to their titles
             movie_map = {}
@@ -438,10 +440,27 @@ def transactions(user_id):
                         movie_map[m_id] = movie.get("title", "Unknown Movie")
                 except Exception:
                     movie_map[m_id] = "Unknown Movie"
+                    
+            # Map theaters
+            theater_map = {}
+            for t_id in theater_ids:
+                try:
+                    obj_id = ObjectId(t_id)
+                    theater = mongo_db.theaters.find_one({"_id": obj_id})
+                    if theater:
+                        theater_map[t_id] = {
+                            "name": theater.get("branch_name", "Unknown Screen"),
+                            "format": theater.get("format", "Standard")
+                        }
+                except Exception:
+                    theater_map[t_id] = {"name": "Unknown Screen", "format": "Standard"}
 
-            # Attach titles to results
+            # Attach titles and theater formats to results
             for row in result:
                 row["movie"] = movie_map.get(str(row["movie_id"]), "Unknown Movie")
+                t_info = theater_map.get(str(row["theater_id"]), {"name": "Unknown Screen", "format": "Standard"})
+                row["theater_name"] = t_info["name"]
+                row["theater_format"] = t_info["format"]
 
         return jsonify(result)
     finally:
@@ -460,6 +479,7 @@ def list_bookings():
                        p.status,
                        u.email as user_email,
                        st.movie_id,
+                       st.theater_id,
                        s.seat
                 FROM payments p
                 JOIN booking b ON p.book_id = b.book_id
@@ -471,12 +491,13 @@ def list_bookings():
             """)
             result = cursor.fetchall()
 
-        # Fetch movie titles from MongoDB
+        # Fetch movie titles and theaters from MongoDB
         if result:
             from db import get_mongo_db
             from bson.objectid import ObjectId
             mongo_db = get_mongo_db()
             movie_ids = list(set([str(r["movie_id"]) for r in result if r.get("movie_id")]))
+            theater_ids = list(set([str(r["theater_id"]) for r in result if r.get("theater_id")]))
             
             movie_map = {}
             for m_id in movie_ids:
@@ -488,8 +509,24 @@ def list_bookings():
                 except Exception:
                     movie_map[m_id] = "Unknown Movie"
 
+            theater_map = {}
+            for t_id in theater_ids:
+                try:
+                    obj_id = ObjectId(t_id)
+                    theater = mongo_db.theaters.find_one({"_id": obj_id})
+                    if theater:
+                        theater_map[t_id] = {
+                            "name": theater.get("branch_name", "Unknown Screen"),
+                            "format": theater.get("format", "Standard")
+                        }
+                except Exception:
+                    theater_map[t_id] = {"name": "Unknown Screen", "format": "Standard"}
+
             for row in result:
                 row["movie"] = movie_map.get(str(row["movie_id"]), "Unknown Movie")
+                t_info = theater_map.get(str(row["theater_id"]), {"name": "Unknown Screen", "format": "Standard"})
+                row["theater_name"] = t_info["name"]
+                row["theater_format"] = t_info["format"]
 
         return jsonify(result)
     finally:
