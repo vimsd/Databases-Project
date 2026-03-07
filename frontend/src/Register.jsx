@@ -8,6 +8,11 @@ export default function Register({ onRegister, switchToLogin }) {
   const [error, setError] = useState("");
 
   const register = async () => {
+    if (!email.toLowerCase().endsWith("@gmail.com")) {
+      alert("Please use a Gmail address (@gmail.com)");
+      setError("Only Gmail addresses are allowed");
+      return;
+    }
     setError("");
     try {
       const res = await fetch(`${API}/register`, {
@@ -40,7 +45,7 @@ export default function Register({ onRegister, switchToLogin }) {
       <button onClick={register}>Register</button>
       <p>
         Already have an account?{' '}
-        <a href="#" onClick={e => {e.preventDefault(); switchToLogin();}}>
+        <a href="#" onClick={e => { e.preventDefault(); switchToLogin(); }}>
           Login
         </a>
       </p>

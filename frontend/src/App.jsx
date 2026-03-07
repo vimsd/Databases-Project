@@ -15,6 +15,19 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Persistence: Check localStorage on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem("cinebook_user");
+    if (savedUser) {
+      try {
+        const u = JSON.parse(savedUser);
+        setUser(u);
+      } catch (e) {
+        localStorage.removeItem("cinebook_user");
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (user) setPage("cinema");
   }, [user]);
@@ -22,6 +35,7 @@ function App() {
   const handleLogin = (userData) => {
     const u = { ...userData, balance: Number(userData.balance || 0) };
     setUser(u);
+    localStorage.setItem("cinebook_user", JSON.stringify(u));
     if (location.pathname === "/transactions") {
       // stay on /transactions so they see the page
     } else {
@@ -37,7 +51,11 @@ function App() {
         const newBalance = Number(data.balance || 0);
         // Only update if balance changed to prevent unnecessary re-renders during input
         if (newBalance !== user.balance) {
-          setUser(prev => ({ ...prev, ...data, balance: newBalance }));
+          setUser(prev => {
+            const updated = { ...prev, ...data, balance: newBalance };
+            localStorage.setItem("cinebook_user", JSON.stringify(updated));
+            return updated;
+          });
         }
       })
       .catch(console.error);
@@ -58,6 +76,7 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem("cinebook_user");
     setPage("login");
     navigate("/");
   };
@@ -124,8 +143,6 @@ function Header({ user, onLogout, searchTerm, setSearchTerm, onGoHome }) {
         </div>
         <nav className="hidden md:flex items-center gap-9">
           <button onClick={onGoHome} className="text-neutral-muted hover:text-white text-sm font-medium transition-colors">Movies</button>
-          <a className="text-neutral-muted hover:text-white text-sm font-medium transition-colors" href="#">Cinemas</a>
-          <a className="text-neutral-muted hover:text-white text-sm font-medium transition-colors" href="#">Offers</a>
           <button onClick={() => navigate("/transactions")} className="text-neutral-muted hover:text-white text-sm font-medium transition-colors">My Bookings</button>
         </nav>
       </div>
@@ -146,15 +163,12 @@ function Header({ user, onLogout, searchTerm, setSearchTerm, onGoHome }) {
                 <span className="material-symbols-outlined text-base">admin_panel_settings</span> Admin Panel
               </button>
             )}
-            <button
-              onClick={() => navigate("/profile")}
-              className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2"
-            >
+            <div className="text-sm font-medium flex items-center gap-2">
               <div className="size-8 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/30">
                 <span className="material-symbols-outlined text-sm">person</span>
               </div>
               {user.email} (฿{Number(user.balance || 0).toFixed(2)})
-            </button>
+            </div>
             <button onClick={onLogout} className="text-neutral-muted hover:text-white transition-colors material-symbols-outlined" title="Logout">logout</button>
           </div>
         ) : (
@@ -221,9 +235,13 @@ function Cinema({ user, navigate, searchTerm }) {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [theaters, setTheaters] = useState([]);
 
+  const fetchMovies = () => {
+    fetch(`${API}/movies`).then(r => r.json()).then(d => setMovies(Array.isArray(d) ? d : [])).catch(console.error);
+  };
+
   useEffect(() => {
-    fetch(`${API}/movies`).then(r => r.json()).then(setMovies).catch(console.error);
-    fetch(`${API}/mongo/theaters`).then(r => r.json()).then(setTheaters).catch(console.error);
+    fetchMovies();
+    fetch(`${API}/mongo/theaters`).then(r => r.json()).then(d => setTheaters(Array.isArray(d) ? d : [])).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -231,16 +249,16 @@ function Cinema({ user, navigate, searchTerm }) {
     fetch(`${API}/showtimes?movie_id=${movieId}`)
       .then(r => r.json())
       .then(data => {
-        setShowtimes(data);
+        setShowtimes(Array.isArray(data) ? data : []);
         setSelectedFormat(null); // Reset format when new movie is loaded
-      });
+      }).catch(console.error);
   }, [movieId]);
 
   useEffect(() => {
     if (!showtimeId) return;
     fetch(`${API}/seats?showtime_id=${showtimeId}`)
       .then(r => r.json())
-      .then(setSeats);
+      .then(d => setSeats(Array.isArray(d) ? d : [])).catch(console.error);
   }, [showtimeId]);
 
   const toggleSeat = (seat) => {
@@ -278,7 +296,7 @@ function Cinema({ user, navigate, searchTerm }) {
   };
 
   const filteredMovies = movies.filter(m =>
-    m.title.toLowerCase().includes(searchTerm?.toLowerCase() || "")
+    (m.title || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   const selectedMovie = movies.find(m => m.movie_id === movieId);
@@ -443,7 +461,7 @@ function Cinema({ user, navigate, searchTerm }) {
             )}
           </div>
 
-          <Reviews movieId={movieId} user={user} />
+          <Reviews movieId={movieId} user={user} onReviewSubmitted={fetchMovies} />
         </div>
       )}
 
@@ -454,52 +472,56 @@ function Cinema({ user, navigate, searchTerm }) {
             {/* Screen */}
             <div className="w-full max-w-xl mb-16">
               <div className="cinema-screen-curve"></div>
-              <p className="text-center text-[10px] tracking-[0.5em] text-neutral-muted uppercase mt-4">Cinema Screen This Way</p>
+              <p className="text-center text-[10px] tracking-[0.5em] text-neutral-muted uppercase mt-4">Theater This Way</p>
             </div>
 
             {/* Seat Grid */}
             <div className="seat-grid flex flex-col gap-3 items-center w-full">
               <div className="flex flex-col gap-3">
                 {
-                  Array.from({ length: Math.ceil(seats.length / 14) }).map((_, rowIndex) => {
-                    const rowSeats = seats.slice(rowIndex * 14, (rowIndex + 1) * 14);
-                    const rowChar = String.fromCharCode(65 + rowIndex);
+                  // Group seats by row (e.g. "A1", "A2" -> Row "A")
+                  Object.entries(
+                    seats.reduce((acc, s) => {
+                      const row = s.seat.charAt(0);
+                      if (!acc[row]) acc[row] = [];
+                      acc[row].push(s);
+                      return acc;
+                    }, {})
+                  )
+                    .sort(([a], [b]) => a.localeCompare(b)) // Sort A-Z
+                    .map(([rowChar, rowSeats]) => {
+                      const renderChunk = (chunk) => chunk.map(s => {
+                        const isSelected = selectedSeats.some(sel => sel.seat_id === s.seat_id);
+                        const isBooked = s.status === 'booked' || s.status === 'pending';
+                        let stateStyles = "bg-neutral-muted/20 hover:bg-neutral-muted/40 text-transparent";
+                        if (isBooked) stateStyles = "bg-neutral-dark text-neutral-muted/30 cursor-not-allowed";
+                        if (isSelected) stateStyles = "bg-primary text-white shadow-[0_0_12px_rgba(234,42,51,0.6)]";
 
-                    // Split 14 seats into 2-9-3 chunks
-                    const chunk1 = rowSeats.slice(0, 2);
-                    const chunk2 = rowSeats.slice(2, 11);
-                    const chunk3 = rowSeats.slice(11, 14);
+                        return (
+                          <button
+                            key={s.seat_id}
+                            disabled={isBooked}
+                            onClick={() => toggleSeat(s)}
+                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-all text-[10px] font-bold ${stateStyles}`}
+                          >
+                            {isBooked ? '×' : (isSelected ? s.seat : <span className="opacity-0 hover:opacity-100">{s.seat}</span>)}
+                          </button>
+                        );
+                      });
 
-                    const renderChunk = (chunk) => chunk.map(s => {
-                      const isSelected = selectedSeats.some(sel => sel.seat_id === s.seat_id);
-                      const isBooked = s.status === 'booked' || s.status === 'pending';
-                      let stateStyles = "bg-neutral-muted/20 hover:bg-neutral-muted/40 text-transparent";
-                      if (isBooked) stateStyles = "bg-neutral-dark text-neutral-muted/30 cursor-not-allowed";
-                      if (isSelected) stateStyles = "bg-primary text-white shadow-[0_0_12px_rgba(234,42,51,0.6)]";
+                      const leftHalf = rowSeats.slice(0, 8);
+                      const rightHalf = rowSeats.slice(8);
 
                       return (
-                        <button
-                          key={s.seat_id}
-                          disabled={isBooked}
-                          onClick={() => toggleSeat(s)}
-                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-all text-[10px] font-bold ${stateStyles}`}
-                        >
-                          {isBooked ? '×' : (isSelected ? s.seat : <span className="opacity-0 hover:opacity-100">{s.seat}</span>)}
-                        </button>
-                      );
-                    });
-
-                    return (
-                      <div key={rowIndex} className="flex items-center gap-4 seat-row group/row">
-                        <span className="w-4 text-[10px] text-neutral-muted font-bold group-hover/row:text-primary transition-colors">{rowChar}</span>
-                        <div className="flex gap-4">
-                          <div className="flex gap-2">{renderChunk(chunk1)}</div>
-                          <div className="flex gap-2 mx-4">{renderChunk(chunk2)}</div>
-                          <div className="flex gap-2">{renderChunk(chunk3)}</div>
+                        <div key={rowChar} className="flex items-center gap-4 seat-row group/row">
+                          <span className="w-4 text-[10px] text-neutral-muted font-bold group-hover/row:text-primary transition-colors">{rowChar}</span>
+                          <div className="flex gap-4">
+                            <div className="flex gap-2">{renderChunk(leftHalf)}</div>
+                            <div className="flex gap-2">{renderChunk(rightHalf)}</div>
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })
+                      )
+                    })
                 }
               </div>
             </div>
@@ -540,7 +562,7 @@ function Cinema({ user, navigate, searchTerm }) {
                     <div className="flex items-center gap-3 text-neutral-muted">
                       <span className="material-symbols-outlined text-primary text-xl">smart_display</span>
                       <div>
-                        <div className="text-[10px] uppercase font-bold">Screen Format</div>
+                        <div className="text-[10px] uppercase font-bold">Theater Info</div>
                         <div className="text-white text-xs">
                           {theaters.find(t => String(t._id) === String(selectedShowtime?.theater_id))?.branch_name || 'Theater'}
                           <span className="text-primary ml-1 font-bold">({theaters.find(t => String(t._id) === String(selectedShowtime?.theater_id))?.format || 'Standard'})</span>
@@ -656,7 +678,7 @@ const styles = {
   }
 };
 
-function Reviews({ movieId, user }) {
+function Reviews({ movieId, user, onReviewSubmitted }) {
   const [reviews, setReviews] = useState([]);
   const [canReview, setCanReview] = useState(false);
   const [loadingObj, setLoadingObj] = useState(true);
@@ -712,13 +734,15 @@ function Reviews({ movieId, user }) {
         setComment("");
         setRating(5);
         fetchReviews();
+        if (onReviewSubmitted) setTimeout(onReviewSubmitted, 500);
         alert("Review submitted!");
       } else {
         const err = await res.json();
         alert(err.error || "Failed to submit review");
       }
     } catch (e) {
-      alert("Network error");
+      console.error("Submission error:", e);
+      alert("Error: " + e.message);
     } finally {
       setSubmitting(false);
     }
@@ -795,14 +819,14 @@ function Reviews({ movieId, user }) {
           ) : (
             reviews.map(r => (
               <div key={r._id} className="bg-neutral-dark/30 p-5 rounded-2xl border border-neutral-dark/50 flex gap-4 items-start">
-                <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
-                  U{r.mysql_user_id}
+                <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-medium shrink-0 text-[10px] overflow-hidden px-1">
+                  {r.email?.split('@')[0].substring(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1">
                   <div className="flex justify-between items-start mb-1">
-                    <div className="font-bold text-sm">User {r.mysql_user_id}</div>
+                    <div className="font-bold text-sm text-primary">{r.email}</div>
                     <div className="flex text-yellow-400 text-sm">
-                      {[...Array(r.rating)].map((_, i) => <span key={i} className="material-symbols-outlined text-[14px]">star</span>)}
+                      {[...Array(Number(r.rating))].map((_, i) => <span key={i} className="material-symbols-outlined text-[14px]">star</span>)}
                     </div>
                   </div>
                   <div className="text-[10px] text-neutral-muted uppercase tracking-wider mb-3">

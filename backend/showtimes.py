@@ -14,14 +14,16 @@ def get_showtimes():
         with conn.cursor() as cursor:
             if movie_id:
                 cursor.execute("""
-                    SELECT showtime_id, theater_id, movie_id, showtime
+                    SELECT showtime_id, theater_id, movie_id, 
+                           DATE_FORMAT(showtime, '%%Y-%%m-%%dT%%H:%%i:%%s') AS showtime
                     FROM showtimes
                     WHERE movie_id = %s
                     ORDER BY showtime ASC
                 """, (movie_id,))
             else:
                 cursor.execute("""
-                    SELECT showtime_id, theater_id, movie_id, showtime
+                    SELECT showtime_id, theater_id, movie_id, 
+                           DATE_FORMAT(showtime, '%Y-%m-%dT%H:%i:%s') AS showtime
                     FROM showtimes
                     ORDER BY showtime ASC
                 """)

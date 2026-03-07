@@ -48,8 +48,10 @@ def seed_database():
                 print("Could not connect to database after several attempts. Skipping seed.")
                 return
 
-    # Seeding logic below will now use upsert to avoid duplicates
-    pass
+    # Seeding logic below will now use upsert to avoid duplicates, but to completely verify we don't erase user data:
+    if mongo_db.theaters.count_documents({}) > 0:
+        print("Database already seeded with theaters. Skipping seed to prevent data loss.")
+        return
 
     # 1. Upsert Movies into MongoDB
     print("Upserting default movies into MongoDB...")
@@ -62,7 +64,7 @@ def seed_database():
             "content_rating": "PG-13",
             "cast": [{"name": "Timothee Chalamet"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/5/52/Dune_Part_Two_poster.jpeg"},
-            "stats": {"average_rating": 4.8, "total_reviews": 1500}
+            "stats": {"average_rating": None, "total_reviews": 0}
         },
         {
             "title": "Oppenheimer",
@@ -72,7 +74,7 @@ def seed_database():
             "content_rating": "R",
             "cast": [{"name": "Cillian Murphy"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/4/4a/Oppenheimer_%28film%29.jpg"},
-            "stats": {"average_rating": 4.9, "total_reviews": 2000}
+            "stats": {"average_rating": None, "total_reviews": 0}
         },
 # 1. Barbie
         {
@@ -83,7 +85,7 @@ def seed_database():
             "content_rating": "PG-13",
             "cast": [{"name": "Margot Robbie"}, {"name": "Ryan Gosling"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/0/0b/Barbie_2023_poster.jpg"},
-            "stats": {"average_rating": 4.5, "total_reviews": 1500}
+            "stats": {"average_rating": None, "total_reviews": 0}
         },
     # 2. The Dark Knight (แทน Dune)
         {
@@ -94,7 +96,7 @@ def seed_database():
             "content_rating": "PG-13",
             "cast": [{"name": "Christian Bale"}, {"name": "Heath Ledger"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/1/1c/The_Dark_Knight_%282008_film%29.jpg"},
-            "stats": {"average_rating": 4.9, "total_reviews": 5000}
+            "stats": {"average_rating": None, "total_reviews": 0}
         },
     # 3. Spider-Man: Across the Spider-Verse
         {
@@ -105,7 +107,7 @@ def seed_database():
             "content_rating": "PG",
             "cast": [{"name": "Shameik Moore"}, {"name": "Hailee Steinfeld"}],
             "media": {"poster_url": "https://upload.wikimedia.org/wikipedia/en/b/b4/Spider-Man-_Across_the_Spider-Verse_poster.jpg"},
-            "stats": {"average_rating": 4.9, "total_reviews": 2800}
+            "stats": {"average_rating": None, "total_reviews": 0}
         }
     ]
 
@@ -129,25 +131,22 @@ def seed_database():
     print(f"Movies synced! Dune ID: {dune_id}, Oppenheimer ID: {oppenheimer_id}")
 
     # 2. Insert Theaters into MongoDB
-    print("Inserting Screens into MongoDB...")
+    print("Inserting Theaters into MongoDB...")
     mongo_db.theaters.delete_many({}) # ensure fresh
     theaters_data = [
         {
-            "branch_name": "Screen 1",
+            "branch_name": "Theater 1",
             "format": "IMAX",
-            "location": {"city": "Bangkok", "address": "Central Ladprao"},
             "updated_at": datetime.datetime.utcnow()
         },
         {
-            "branch_name": "Screen 2",
+            "branch_name": "Theater 2",
             "format": "4DX",
-            "location": {"city": "Bangkok", "address": "Central Ladprao"},
             "updated_at": datetime.datetime.utcnow()
         },
         {
-            "branch_name": "Screen 3",
+            "branch_name": "Theater 3",
             "format": "Standard",
-            "location": {"city": "Bangkok", "address": "Central Ladprao"},
             "updated_at": datetime.datetime.utcnow()
         }
     ]
@@ -155,7 +154,7 @@ def seed_database():
     theater_1_id = str(theater_result.inserted_ids[0])
     theater_2_id = str(theater_result.inserted_ids[1])
     theater_3_id = str(theater_result.inserted_ids[2])
-    print(f"Screens inserted! Screen 1: {theater_1_id}, Screen 2: {theater_2_id}, Screen 3: {theater_3_id}")
+    print(f"Theaters inserted! Theater 1: {theater_1_id}, Theater 2: {theater_2_id}, Theater 3: {theater_3_id}")
 
     # 3. Insert Showtimes and Seats into MySQL using the string IDs
     print("Inserting showtimes and seats into MySQL...")
@@ -189,22 +188,27 @@ def seed_database():
         cursor.execute("TRUNCATE TABLE seats")
         cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
         
-        # Define Tiers: row_prefix, num_seats, (imax_price, 4dx_price, standard_price)
+        # Define Tiers: row_prefix (list), num_seats, (standard_price, imax_price, 4dx_price)
+        # Note: Index 0=Standard, 1=IMAX, 2=4DX
         tiers = [
-            ({'A'}, 6, (800.00, 800.00, 500.00)),       # VIP/Sofa
-            ({'B', 'C'}, 8, (450.00, 450.00, 280.00)),  # Premium
-            ({'D', 'E'}, 10, (350.00, 350.00, 200.00))  # Standard
+            (['A', 'B', 'C'], 16, (200.00, 350.00, 380.00)),  # Front
+            (['D', 'E', 'F'], 16, (250.00, 450.00, 500.00)),  # Middle
+            (['G'], 16, (450.00, 750.00, 800.00))             # Back/Premium
         ]
         
-        screen_specs = [
-            (theater_1_id, 0), # 0 = IMAX index
-            (theater_2_id, 1), # 1 = 4DX index
-            (theater_3_id, 2)  # 2 = Standard index
+        # Mapping theater IDs to their price index (0=Standard, 1=IMAX, 2=4DX)
+        theater_list = [
+            (theater_1_id, "IMAX"),
+            (theater_2_id, "4DX"),
+            (theater_3_id, "Standard")
         ]
         
-        for tid, price_idx in screen_specs:
-            for rows, num_seats, prices in tiers:
-                seat_price = prices[price_idx]
+        format_to_idx = {"Standard": 0, "IMAX": 1, "4DX": 2}
+
+        for tid, t_format in theater_list:
+            price_idx = format_to_idx.get(t_format, 0)
+            for rows, num_seats, p_set in tiers:
+                seat_price = p_set[price_idx]
                 for row in rows:
                     for num in range(1, num_seats + 1):
                         seat_label = f"{row}{num}"

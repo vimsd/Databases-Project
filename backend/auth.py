@@ -13,6 +13,9 @@ def register():
     email = data['email']
     password = data['password']
 
+    if not email.lower().endswith("@gmail.com"):
+        return jsonify({"message": "Only Gmail addresses are allowed (@gmail.com)"}), 400
+
     try:
         conn = get_connection()
         with conn.cursor() as cursor:
