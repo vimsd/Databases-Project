@@ -5,6 +5,8 @@ import Register from "./Register";
 import Transactions from "./Transactions";
 import Admin from "./Admin";
 import Profile from "./Profile";
+import Wallet from "./Wallet";
+import AdminWallet from "./AdminWallet";
 
 const API = import.meta.env.VITE_API || "/api";
 
@@ -99,6 +101,8 @@ function App() {
         <Routes>
           <Route path="/transactions" element={<TransactionsPage user={user} page={page} setPage={setPage} handleLogin={handleLogin} handleRegister={handleRegister} refreshUser={refreshUser} />} />
           <Route path="/profile" element={<Profile user={user} />} />
+          <Route path="/wallet" element={<Wallet user={user} refreshUser={refreshUser} />} />
+          <Route path="/admin/wallet" element={<AdminWallet />} />
           <Route path="/*" element={
             <>
               {(!user && page === "login") && (
@@ -142,8 +146,15 @@ function Header({ user, onLogout, searchTerm, setSearchTerm, onGoHome }) {
           <h2 className="text-slate-100 text-xl font-bold leading-tight tracking-tight">CineBook</h2>
         </div>
         <nav className="hidden md:flex items-center gap-9">
-          <button onClick={onGoHome} className="text-neutral-muted hover:text-white text-sm font-medium transition-colors">Movies</button>
-          <button onClick={() => navigate("/transactions")} className="text-neutral-muted hover:text-white text-sm font-medium transition-colors">My Bookings</button>
+          {user?.role !== 'admin' && (
+            <>
+              <button onClick={onGoHome} className="text-neutral-muted hover:text-white text-sm font-medium transition-colors">Movies</button>
+              <button onClick={() => navigate("/transactions")} className="text-neutral-muted hover:text-white text-sm font-medium transition-colors">My Bookings</button>
+            </>
+          )}
+          <button onClick={() => navigate("/wallet")} className="text-primary hover:text-white text-sm font-bold flex items-center gap-1 transition-colors">
+            <span className="material-symbols-outlined text-base">account_balance_wallet</span> Wallet
+          </button>
         </nav>
       </div>
       <div className="flex items-center gap-4 md:gap-6">
@@ -159,9 +170,14 @@ function Header({ user, onLogout, searchTerm, setSearchTerm, onGoHome }) {
         {user ? (
           <div className="flex items-center gap-4">
             {user.role === 'admin' && (
-              <button onClick={() => navigate("/admin")} className="text-primary hover:text-white transition-colors text-sm font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-base">admin_panel_settings</span> Admin Panel
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => navigate("/admin")} className="text-primary hover:text-white transition-colors text-sm font-bold flex items-center gap-1">
+                  <span className="material-symbols-outlined text-base">admin_panel_settings</span> Dashboard
+                </button>
+                <button onClick={() => navigate("/admin/wallet")} className="text-primary hover:text-white transition-colors text-sm font-bold flex items-center gap-1">
+                  <span className="material-symbols-outlined text-base">payments</span> Top-ups
+                </button>
+              </div>
             )}
             <div className="text-sm font-medium flex items-center gap-2">
               <div className="size-8 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/30">

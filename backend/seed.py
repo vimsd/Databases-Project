@@ -14,13 +14,27 @@ def get_mysql_connection():
     )
 
 def get_mongo_db():
-    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/cinema_logs")
+    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/cinema_db")
     client = MongoClient(mongo_uri)
     return client.get_database()
                     
 import time
 
+def load_env():
+    # Only load .env if we are not running in a container (where DB_HOST is already set to something else)
+    if os.getenv("DB_HOST") in ["mysql_db", "cinema_mysql"]:
+        return
+        
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                if '=' in line:
+                    key, value = line.strip().split('=', 1)
+                    os.environ[key] = value
+
 def seed_database():
+    load_env()
     print("Checking if database needs seeding...")
     
     max_retries = 10
@@ -47,6 +61,18 @@ def seed_database():
             else:
                 print("Could not connect to database after several attempts. Skipping seed.")
                 return
+
+    # 1. Initialize Settings (QR Code) in MongoDB
+    print("Initializing system settings...")
+    mongo_db.settings.update_one(
+        {"key": "payment_qr"},
+        {"$set": {
+            "key": "payment_qr",
+            "value": "https://ci3.googleusercontent.com/mail-img-att/AGAZnRrptIHeLDdvrrftdUZA5tf29FxHcIpXU-j1-EVXW8sQoaCvtte_jqHDWlpqJNJpeDA_8XOCLSxlO_QEbW6yrWMLxiGqSle0GiVpPuTROSOwjiSQ4koeCmckbyfkqjLZfDqMVkX05-FrUgjFQVJoOur3NX4MPabRyeFPMBZwmCVWlPwbfUZxlWHPvmCmsayfIfQeb6B7DT1aeKPmsLAcEToBZvK_QoA8SS_3j2dpdhQNeG8-fSAZjfqzvwE0MndWk4hZm4ewSTRqqNly6Ok4xGwJyM0UQrSgxlau-O6n_DeuHhky4UWjg_IVjBrjPuE9xw826CYR8M3QhbC1TxZOqu3DtXy--9pAe4PQIYqbzA2wokDq9o5bOl4yIcu_Bda6-4exBHO6L8pLlwztEP_FugRU-6rtn2KhS2NISjohCu6wODBf8JQKkh-IIGIRhYf76ylbk5mTNkw2_MHYU6vBlWdRB6TQ4vy_SVEci4TbnGpogszj8_p61BNNAkmTmqFOjwgL8ZmLKN9ZLDLo2qDcIEtiHHyymWMlnFVIu_j7dabHWy6BjgynGCO1wEFJA4ErqjCP-52jPeiCkJur-Rrf91r9je4_dXmYw3gkKnFqdf6Rins16bd2Uv2gR2WXPgRN8aFxdQAwWtktn5DXTfgQPxz58XSxEYDC3hPS13ehplbzzaMOfo5b387rKNbaOVxZYErWwq60Jd5rAXxAiB7j5lxpGbi-9K1fMJc0wvfUg1BVud51GtWiOgimN2ROW-BtLywPFu9Sc3SaEZz086ZxJQboGN7RX-qviOPDG1Vw9QN8jgJ3BRP8xzH1x6vadAxXgHAj92FTTUrCuUkmIJTqtmGevHz9MlKznSjTXrLARzC_FhFPKY9id9pS4UFWB9_HctynZU-BwkGvjdFpCwiPwNa6D-vHre7dPykRTiU0s4ORfA7rFic2dfsQYDj-qfZ5hTLSpwCXfmxmHD4WKHgusbGJuGszlpX68iL83o2UtmakK7tOpCJHfc7klzR8lrG5Mj6msumbLWsIa_Fb5JheYDS6Mk3ui0tvjqrb5M7ymtTj7zpnXWcu5OoFn8bBXembLExDlDgUHcGyXBA1p1jHr30=s0-l75-ft",
+            "updated_at": datetime.datetime.utcnow()
+        }},
+        upsert=True
+    )
 
     # Seeding logic below will now use upsert to avoid duplicates, but to completely verify we don't erase user data:
     if mongo_db.theaters.count_documents({}) > 0:
@@ -155,6 +181,18 @@ def seed_database():
     theater_2_id = str(theater_result.inserted_ids[1])
     theater_3_id = str(theater_result.inserted_ids[2])
     print(f"Theaters inserted! Theater 1: {theater_1_id}, Theater 2: {theater_2_id}, Theater 3: {theater_3_id}")
+
+    # 3. Initialize Settings (QR Code) in MongoDB
+    print("Initializing system settings...")
+    mongo_db.settings.update_one(
+        {"key": "payment_qr"},
+        {"$set": {
+            "key": "payment_qr",
+            "value": "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=PROMPT_PAY_PAYLOAD_HERE",
+            "updated_at": datetime.datetime.utcnow()
+        }},
+        upsert=True
+    )
 
     # 3. Insert Showtimes and Seats into MySQL using the string IDs
     print("Inserting showtimes and seats into MySQL...")

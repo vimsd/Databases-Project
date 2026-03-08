@@ -15,7 +15,7 @@ def get_connection():
 def get_mongo_db():
     # Use environment variable for MongoDB URI, default to local if not set
     # The default mongo_db from docker-compose is cinema_mongo
-    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/cinema_logs")
+    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/cinema_db")
     client = MongoClient(mongo_uri)
     # The database name will be extracted from the URI or we can specify it
     return client.get_database()
