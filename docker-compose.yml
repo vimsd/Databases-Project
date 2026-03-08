@@ -10,7 +10,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql   # ✅ เพิ่มบรรทัดนี้
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql # ✅ เพิ่มบรรทัดนี้
 
   # -------- MongoDB --------
   mongo_db:
@@ -24,7 +24,7 @@ services:
   # -------- Backend (Flask) --------
   backend:
     build:
-      context: .          # build from project root so we can copy frontend folder
+      context: . # build from project root so we can copy frontend folder
       dockerfile: backend/Dockerfile
     container_name: cinema_backend
     ports:
@@ -37,24 +37,23 @@ services:
       DB_USER: root
       DB_PASSWORD: rootpassword
       DB_NAME: cinema_db
-      MONGO_URI: mongodb://mongo_db:27017/cinema_logs
-
+      MONGO_URI: mongodb://mongo_db:27017/cinema_db
   # -------- Frontend (now served by backend) --------
   # frontend server is no longer needed because the backend image builds
   # the React app and serves the static files.  Keep this commented in case
   # you want to run the Vite dev server separately during development.
-#  frontend:
-#    image: node:22-alpine
-#    container_name: cinema_frontend
-#    working_dir: /app
-#    ports:
-#      - "5173:5173"
-#    volumes:
-#      - ./frontend:/app
-#      - /app/node_modules
-#    command: sh -c "npm install && npm run dev -- --host"
-#    depends_on:
-#      - backend
+  #  frontend:
+  #    image: node:22-alpine
+  #    container_name: cinema_frontend
+  #    working_dir: /app
+  #    ports:
+  #      - "5173:5173"
+  #    volumes:
+  #      - ./frontend:/app
+  #      - /app/node_modules
+  #    command: sh -c "npm install && npm run dev -- --host"
+  #    depends_on:
+  #      - backend
 
 volumes:
   mysql_data:
