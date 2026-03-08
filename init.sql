@@ -83,5 +83,3 @@ VALUES (
         'user'
     );
 
--- Note: movies, theaters, showtimes, and seats are now inserted via backend/seed.py
--- for mapping MongoDB string IDs.
