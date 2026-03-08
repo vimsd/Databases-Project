@@ -3,13 +3,9 @@ DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS topup_requests;
 
 DROP TABLE IF EXISTS book_seat;
-
 DROP TABLE IF EXISTS booking;
-
 DROP TABLE IF EXISTS seats;
-
 DROP TABLE IF EXISTS showtimes;
-
 DROP TABLE IF EXISTS users;
 
 -- USERS
@@ -104,5 +100,3 @@ VALUES (
         'user'
     );
 
--- Note: movies, theaters, showtimes, and seats are now inserted via backend/seed.py
--- for mapping MongoDB string IDs.
