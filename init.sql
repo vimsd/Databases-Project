@@ -1,7 +1,5 @@
 DROP TABLE IF EXISTS payments;
-
 DROP TABLE IF EXISTS topup_requests;
-
 DROP TABLE IF EXISTS book_seat;
 DROP TABLE IF EXISTS booking;
 DROP TABLE IF EXISTS seats;
