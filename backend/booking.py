@@ -406,9 +406,9 @@ def transactions(user_id):
                 SELECT p.payment_id,
                        p.book_id,
                        p.amount,
-                       DATE_FORMAT(p.payment_time, '%%Y-%%m-%%d %%H:%%i:%%s') AS payment_time,
+                       DATE_FORMAT(p.payment_time, '%%Y-%%m-%%dT%%H:%%i:%%s') AS payment_time,
                        p.status,
-                       DATE_FORMAT(st.showtime, '%%Y-%%m-%%d %%H:%%i:%%s') AS showtime,
+                       DATE_FORMAT(st.showtime, '%%Y-%%m-%%dT%%H:%%i:%%s') AS showtime,
                        st.movie_id,
                        st.theater_id,
                        s.seat
@@ -475,9 +475,10 @@ def list_bookings():
                 SELECT p.payment_id,
                        p.book_id,
                        p.amount,
-                       DATE_FORMAT(p.payment_time, '%%Y-%%m-%%d %%H:%%i:%%s') AS payment_time,
+                       DATE_FORMAT(p.payment_time, '%Y-%m-%dT%H:%i:%s') AS payment_time,
                        p.status,
                        u.email as user_email,
+                       DATE_FORMAT(st.showtime, '%Y-%m-%dT%H:%i:%s') AS showtime,
                        st.movie_id,
                        st.theater_id,
                        s.seat

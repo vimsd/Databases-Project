@@ -1,4 +1,7 @@
 DROP TABLE IF EXISTS payments;
+
+DROP TABLE IF EXISTS topup_requests;
+
 DROP TABLE IF EXISTS book_seat;
 DROP TABLE IF EXISTS booking;
 DROP TABLE IF EXISTS seats;
@@ -61,6 +64,20 @@ CREATE TABLE payments (
     status ENUM('Failed', 'Pending', 'Paid') DEFAULT 'Pending',
     payment_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (book_id) REFERENCES booking (book_id)
+);
+
+-- TOPUP REQUESTS
+CREATE TABLE topup_requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    status ENUM(
+        'Pending',
+        'Approved',
+        'Rejected'
+    ) DEFAULT 'Pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (user_id)
 );
 
 INSERT INTO

@@ -16,7 +16,9 @@ def serialize_document(doc):
     doc = dict(doc)
     if "_id" in doc:
         doc["_id"] = serialize_object_id(doc["_id"])
-        doc["movie_id"] = doc["_id"]  # Ensure backward compatibility with MySQL movie_id
+        # Only map movie_id for movie documents to avoid overwriting foreign keys in reviews
+        if "title" in doc:
+            doc["movie_id"] = doc["_id"]
     if "movie_id" in doc and isinstance(doc["movie_id"], ObjectId):
         doc["movie_id"] = serialize_object_id(doc["movie_id"])
     return doc
@@ -53,7 +55,7 @@ def api_get_movies():
                 "total_reviews": stats[0]["count"]
             }
         else:
-            movie["stats"] = {"average_rating": 0.0, "total_reviews": 0}
+            movie["stats"] = {"average_rating": None, "total_reviews": 0}
             
     return jsonify(serialize_list(movies)), 200
 
@@ -122,21 +124,49 @@ def api_get_theaters():
 
 @mongo_bp.route('/api/mongo/theaters', methods=['POST'])
 def api_create_theater():
-    """Create a new Screen (previously theater branch)"""
+    """Create a new Theater (previously Screen)"""
     data = request.get_json() or {}
     required = ['branch_name']
     if any(field not in data for field in required):
-        return jsonify({"error": "branch_name is required"}), 400
+        return jsonify({"error": "Theater name is required"}), 400
 
     mongo_db = get_mongo_db()
     theater_doc = {
         "branch_name": data['branch_name'],
         "format": data.get('format', 'Standard'),
-        "location": data.get('location', {"city": "Poipet", "address": "Central Poipet"}),
-        "facilities": data.get('facilities', []),
         "updated_at": data.get('updated_at') or datetime.datetime.utcnow()
     }
     result = mongo_db.theaters.insert_one(theater_doc)
+    theater_id_str = str(result.inserted_id)
+
+    # Automatically generate 112 seats (16x7 grid) in MySQL
+    tiers = [
+        (['A', 'B', 'C'], 16, (200.00, 350.00, 380.00)),  # Front
+        (['D', 'E', 'F'], 16, (250.00, 450.00, 500.00)),  # Middle
+        (['G'], 16, (450.00, 750.00, 800.00))             # Back/Premium
+    ]
+    format_to_idx = {"Standard": 0, "IMAX": 1, "4DX": 2}
+    p_idx = format_to_idx.get(theater_doc["format"], 0)
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            for rows, num_seats, prices in tiers:
+                seat_price = prices[p_idx]
+                for row in rows:
+                    for num in range(1, num_seats + 1):
+                        seat_label = f"{row}{num}"
+                        cursor.execute(
+                            "INSERT INTO seats (theater_id, seat, price) VALUES (%s, %s, %s)",
+                            (theater_id_str, seat_label, seat_price)
+                        )
+        conn.commit()
+    except Exception as e:
+        if 'conn' in locals() and conn: conn.rollback()
+        print(f"Failed to auto-generate seats for new theater {theater_id_str}: {e}")
+    finally:
+        if 'conn' in locals() and conn: conn.close()
+
     created = mongo_db.theaters.find_one({"_id": result.inserted_id})
     return jsonify(serialize_document(created)), 201
 
@@ -187,7 +217,32 @@ def api_get_reviews_for_movie(movie_id):
     except Exception:
         return jsonify({"error": "invalid movie_id"}), 400
 
-    reviews = mongo_db.reviews.find({"movie_id": movie_obj_id}).sort("created_at", -1)
+    reviews_cursor = mongo_db.reviews.find({"movie_id": movie_obj_id}).sort("created_at", -1)
+    reviews = list(reviews_cursor)
+    
+    if not reviews:
+        return jsonify([]), 200
+
+    # Fetch emails from MySQL for all reviewers
+    user_ids = list(set(r["mysql_user_id"] for r in reviews))
+    user_map = {}
+    
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            format_strings = ','.join(['%s'] * len(user_ids))
+            cursor.execute(f"SELECT user_id, email FROM users WHERE user_id IN ({format_strings})", tuple(user_ids))
+            for row in cursor.fetchall():
+                user_map[row['user_id']] = row['email']
+    except Exception as e:
+        print(f"Error fetching user emails for reviews: {e}")
+    finally:
+        if 'conn' in locals() and conn: conn.close()
+
+    # Attach emails to review objects
+    for r in reviews:
+        r["email"] = user_map.get(r["mysql_user_id"], f"User {r['mysql_user_id']}")
+
     return jsonify(serialize_list(reviews)), 200
 
 @mongo_bp.route('/api/mongo/movies/<movie_id>/reviews', methods=['POST'])
@@ -199,41 +254,44 @@ def api_create_review(movie_id):
 
     try:
         movie_obj_id = ObjectId(movie_id)
-    except Exception:
-        return jsonify({"error": "invalid movie_id"}), 400
-
-    mongo_db = get_mongo_db()
-    review_doc = {
-        "movie_id": movie_obj_id,
-        "mysql_user_id": data['mysql_user_id'],
-        "rating": data['rating'],
-        "comment": data['comment'],
-        "contains_spoilers": bool(data.get('contains_spoilers', False)),
-        "likes_count": data.get('likes_count', 0),
-        "created_at": datetime.datetime.utcnow()
-    }
-    result = mongo_db.reviews.insert_one(review_doc)
-    
-    # Update movie stats for performance (redundant but helpful for quick listing)
-    pipeline = [
-        {"$match": {"movie_id": movie_obj_id}},
-        {"$group": {
-            "_id": "$movie_id",
-            "avg_rating": {"$avg": "$rating"},
-            "count": {"$sum": 1}
-        }}
-    ]
-    stats = list(mongo_db.reviews.aggregate(pipeline))
-    if stats:
-        mongo_db.movies.update_one(
-            {"_id": movie_obj_id},
+        mysql_user_id = int(data['mysql_user_id'])
+        mongo_db = get_mongo_db()
+        
+        # Use upsert to ensure one review per user per movie
+        mongo_db.reviews.update_one(
+            {"movie_id": movie_obj_id, "mysql_user_id": mysql_user_id},
             {"$set": {
-                "stats.average_rating": round(stats[0]["avg_rating"], 1),
-                "stats.total_reviews": stats[0]["count"]
-            }}
+                "rating": int(data.get('rating', 5)),
+                "comment": data['comment'],
+                "created_at": datetime.datetime.utcnow()
+            }},
+            upsert=True
         )
+        
+        # Update movie stats for performance
+        pipeline = [
+            {"$match": {"movie_id": movie_obj_id}},
+            {"$group": {
+                "_id": "$movie_id",
+                "avg_rating": {"$avg": "$rating"},
+                "count": {"$sum": 1}
+            }}
+        ]
+        stats = list(mongo_db.reviews.aggregate(pipeline))
+        if stats:
+            avg = stats[0]["avg_rating"]
+            mongo_db.movies.update_one(
+                {"_id": movie_obj_id},
+                {"$set": {
+                    "stats.average_rating": round(avg, 1) if avg is not None else None,
+                    "stats.total_reviews": stats[0]["count"]
+                }}
+            )
 
-    created = mongo_db.reviews.find_one({"_id": result.inserted_id})
-    return jsonify(serialize_document(created)), 201
+        created = mongo_db.reviews.find_one({"movie_id": movie_obj_id, "mysql_user_id": mysql_user_id})
+        return jsonify(serialize_document(created)), 201
+    except Exception as e:
+        print(f"Error in api_create_review: {e}")
+        return jsonify({"error": str(e)}), 500
 
 

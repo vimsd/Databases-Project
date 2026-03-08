@@ -22,9 +22,9 @@ export default function Admin() {
     const [filterMovieId, setFilterMovieId] = useState("");
 
     const fetchData = () => {
-        fetch(`${API}/movies`).then(r => r.json()).then(setMovies).catch(console.error);
-        fetch(`${API}/mongo/theaters`).then(r => r.json()).then(setTheaters).catch(console.error);
-        fetch(`${API}/showtimes`).then(r => r.json()).then(setShowtimes).catch(console.error);
+        fetch(`${API}/movies`).then(r => r.json()).then(d => setMovies(Array.isArray(d) ? d : [])).catch(console.error);
+        fetch(`${API}/mongo/theaters`).then(r => r.json()).then(d => setTheaters(Array.isArray(d) ? d : [])).catch(console.error);
+        fetch(`${API}/showtimes`).then(r => r.json()).then(d => setShowtimes(Array.isArray(d) ? d : [])).catch(console.error);
     };
 
     useEffect(() => {
@@ -227,17 +227,17 @@ export default function Admin() {
                     </div>
                 </div>
 
-                {/* ADD SCREEN FORM */}
+                {/* ADD THEATER FORM */}
                 <div style={styles.card}>
-                    <h2 style={{ color: "#00ffcc" }}>2. Add Screen (Central Ladprao)</h2>
+                    <h2 style={{ color: "#00ffcc" }}>2. Add Theater (Central Ladprao)</h2>
                     <form onSubmit={handleAddTheater}>
-                        <input style={styles.input} required placeholder="Screen Name (e.g. Screen 4)" value={theaterForm.branch_name} onChange={e => setTheaterForm({ ...theaterForm, branch_name: e.target.value })} />
+                        <input style={styles.input} required placeholder="Theater Name (e.g. Theater 4)" value={theaterForm.branch_name} onChange={e => setTheaterForm({ ...theaterForm, branch_name: e.target.value })} />
                         <select style={styles.input} required value={theaterForm.format} onChange={e => setTheaterForm({ ...theaterForm, format: e.target.value })}>
                             <option value="Standard">Standard</option>
                             <option value="IMAX">IMAX</option>
                             <option value="4DX">4DX</option>
                         </select>
-                        <button style={styles.button} type="submit">Add Screen</button>
+                        <button style={styles.button} type="submit">Add Theater</button>
                     </form>
                 </div>
 

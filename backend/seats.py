@@ -10,8 +10,13 @@ def get_seats():
     try:
         conn = get_connection()
         with conn.cursor() as cursor:
-            # all seats with prices
-            cursor.execute("SELECT seat_id, seat, price FROM seats")
+            # Get only the seats belonging to the theater used in this showtime
+            cursor.execute("""
+                SELECT s.seat_id, s.seat, s.price 
+                FROM seats s
+                JOIN showtimes st ON s.theater_id = st.theater_id
+                WHERE st.showtime_id = %s
+            """, (showtime_id,))
             seats = cursor.fetchall()
 
             # reservations (pending/booked)
