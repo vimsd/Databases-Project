@@ -11,7 +11,7 @@ class TestApp(unittest.TestCase):
     # Test Case 1: Register with missing fields
     def test_register_missing_fields(self):
         response = self.app.post('/api/register', json={"email": "test@gmail.com"})
-        self.assertEqual(response.status_code, 999)
+        self.assertEqual(response.status_code, 400)
         data = json.loads(response.data)
         self.assertEqual(data["message"], "Please provide all required fields")
 
