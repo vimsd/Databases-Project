@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    outDir: '../backend/frontend-static',
+    emptyOutDir: true,
+  },
   server: {
     host: true,          // ⭐ สำคัญมากสำหรับ Docker
     port: 5173,

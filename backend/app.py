@@ -30,7 +30,8 @@ import os
 @app.route('/<path:path>')
 def serve_frontend(path):
     # look for files under frontend/dist
-    build_dir = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
+    build_dir = os.path.join(os.path.dirname(__file__), 'frontend-static')
+    #build_dir = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
     if path != "" and os.path.exists(os.path.join(build_dir, path)):
         return send_from_directory(build_dir, path)
     if os.path.exists(os.path.join(build_dir, 'index.html')):
@@ -40,4 +41,5 @@ def serve_frontend(path):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)

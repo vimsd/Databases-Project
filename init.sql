@@ -87,7 +87,7 @@ INSERT INTO
     )
 VALUES (
         'admin@gmail.com',
-        'scrypt:32768:8:1$slxychCQmO0Npf8Q$2f47153f81fd277829fd63756c95191078b5ec5b0d9e23c9129339005af4c182d1a40faf85344d5b02468ded056df0d8f5b4a895950f71208b2b1508dd05affd',
+        'scrypt:32768:8:1$NiydfWVAhlxyjU3r$aef7fe95bf4e4fd2b79f22214a655c8cd7fce20755f7423400286b1e6480b6b789ac56b655e5b88b6f200f848195502b86904bf699189070ad7f33f6c2728557',
         0.00,
         'admin'
     ),
