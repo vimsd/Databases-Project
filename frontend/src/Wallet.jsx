@@ -3,12 +3,11 @@ import { useNavigate } from "react-router-dom";
 
 const API = import.meta.env.VITE_API || "/api";
 
-function Wallet({ user, refreshUser }) {
+function Wallet({ user }) {
     const [amount, setAmount] = useState("");
     const [qrUrl, setQrUrl] = useState("");
     const [step, setStep] = useState(1); // 1: Select Amount, 2: QR Code
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState("");
     const navigate = useNavigate();
 
     const presets = [100, 300, 500, 1000, 2000];
@@ -39,7 +38,6 @@ function Wallet({ user, refreshUser }) {
             const data = await res.json();
             if (res.ok) {
                 setStep(2);
-                setMessage(data.message);
             } else {
                 alert(data.error || "Failed to create request");
             }

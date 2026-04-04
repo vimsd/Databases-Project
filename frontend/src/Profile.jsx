@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = import.meta.env.VITE_API || "/api";
@@ -14,15 +14,7 @@ export default function Profile({ user }) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => {
-        if (!user) {
-            navigate("/login");
-            return;
-        }
-        fetchProfileData();
-    }, [user]);
-
-    const fetchProfileData = async () => {
+    const fetchProfileData = useCallback(async () => {
         try {
             // 1. Fetch Mongo Profile
             const profRes = await fetch(`${API}/mongo/profiles/${user.user_id}`);
@@ -46,7 +38,15 @@ export default function Profile({ user }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user.user_id]);
+
+    useEffect(() => {
+        if (!user) {
+            navigate("/login");
+            return;
+        }
+        fetchProfileData();
+    }, [user, navigate, fetchProfileData]);
 
     const handleSave = async (e) => {
         e.preventDefault();

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import Login from "./Login";
 import Register from "./Register";
@@ -11,28 +11,22 @@ import AdminWallet from "./AdminWallet";
 const API = import.meta.env.VITE_API || "/api";
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [page, setPage] = useState("login");
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem("cinebook_user");
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch {
+        localStorage.removeItem("cinebook_user");
+      }
+    }
+    return null;
+  });
+  const [page, setPage] = useState(() => (user ? "cinema" : "login"));
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Persistence: Check localStorage on mount
-  useEffect(() => {
-    const savedUser = localStorage.getItem("cinebook_user");
-    if (savedUser) {
-      try {
-        const u = JSON.parse(savedUser);
-        setUser(u);
-      } catch (e) {
-        localStorage.removeItem("cinebook_user");
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user) setPage("cinema");
-  }, [user]);
 
   const handleLogin = (userData) => {
     const u = { ...userData, balance: Number(userData.balance || 0) };
@@ -45,7 +39,7 @@ function App() {
     }
   };
 
-  const refreshUser = () => {
+  const refreshUser = useCallback(() => {
     if (!user) return;
     fetch(`${API}/users/${user.user_id}`)
       .then(r => r.json())
@@ -61,7 +55,7 @@ function App() {
         }
       })
       .catch(console.error);
-  };
+  }, [user]);
 
   // realtime polling so balance updates when changed by payments/admin
   useEffect(() => {
@@ -70,7 +64,7 @@ function App() {
       refreshUser();
     }, 5000);
     return () => clearInterval(id);
-  }, [user]);
+  }, [user, refreshUser]);
 
   const handleRegister = () => {
     setPage("login");
@@ -639,60 +633,6 @@ function Cinema({ user, navigate, searchTerm }) {
 
 /* ================= STYLES ================= */
 
-const styles = {
-  container: {
-    minHeight: "100vh",
-    backgroundColor: "#111",
-    color: "white",
-    padding: 40
-  },
-  title: {
-    textAlign: "center"
-  },
-  welcome: {
-    textAlign: "center",
-    marginBottom: 20
-  },
-  steps: {
-    display: "flex",
-    justifyContent: "center",
-    gap: 20,
-    marginBottom: 30
-  },
-  step: {
-    opacity: 0.4
-  },
-  activeStep: {
-    fontWeight: "bold",
-    color: "#00ffcc"
-  },
-  grid: {
-    display: "flex",
-    gap: 20,
-    flexWrap: "wrap"
-  },
-  card: {
-    background: "#222",
-    padding: 20,
-    borderRadius: 10,
-    minWidth: 150
-  },
-  input: {
-    padding: 10,
-    marginBottom: 10,
-    width: 200
-  },
-  button: {
-    padding: "8px 12px",
-    background: "#00ffcc",
-    border: "none",
-    cursor: "pointer"
-  },
-  back: {
-    marginBottom: 20,
-    padding: "6px 10px"
-  }
-};
 
 function Reviews({ movieId, user, onReviewSubmitted }) {
   const [reviews, setReviews] = useState([]);
@@ -703,19 +643,14 @@ function Reviews({ movieId, user, onReviewSubmitted }) {
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchReviews();
-    checkCanReview();
-  }, [movieId, user]);
-
-  const fetchReviews = () => {
+  const fetchReviews = useCallback(() => {
     fetch(`${API}/mongo/movies/${movieId}/reviews`)
       .then(r => r.json())
       .then(data => setReviews(Array.isArray(data) ? data : []))
       .catch(console.error);
-  };
+  }, [movieId]);
 
-  const checkCanReview = async () => {
+  const checkCanReview = useCallback(async () => {
     if (!user) {
       setLoadingObj(false);
       return;
@@ -724,12 +659,17 @@ function Reviews({ movieId, user, onReviewSubmitted }) {
       const res = await fetch(`${API}/booking/check-watched?user_id=${user.user_id}&movie_id=${movieId}`);
       const data = await res.json();
       setCanReview(data.can_review);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Error is handled by setCanReview being false
     } finally {
       setLoadingObj(false);
     }
-  };
+  }, [movieId, user]);
+
+  useEffect(() => {
+    fetchReviews();
+    checkCanReview();
+  }, [fetchReviews, checkCanReview]);
 
   const submitReview = async (e) => {
     e.preventDefault();
